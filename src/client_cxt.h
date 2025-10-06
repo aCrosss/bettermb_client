@@ -1,0 +1,63 @@
+#ifndef CLIENT_CXT_H
+#define CLIENT_CXT_H
+
+#include "types.h"
+
+typedef struct {
+    char *device;
+    int   baud;
+    char  parity;
+    int   data_bits;
+    int   stop_bits;
+} serial_cfg;
+
+typedef struct {
+    const char *host;
+    int         tcp_port;
+} tcp_endp;
+
+typedef struct {
+    mb_protocol_t protocol;
+    mb_protocol_t prev_proto;
+
+    fc_t fc;
+    int  waddress;
+    int  wcount;
+    int  raddress;
+    int  rcount;
+
+    u16 tid;
+    int fd;
+} client_cxt_t;
+
+typedef struct statistic {
+    u32 requests;
+    u32 success;
+    u32 timeouts;
+    u32 fails;
+} statistic_t;
+
+typedef struct global {
+    serial_cfg sconf;
+    tcp_endp   tcp_endp;
+
+    client_cxt_t cxt;
+
+    statistic_t stats;
+
+    int slave_id_start;
+    int slave_id_end;
+    int response_timeout;
+    int request_count;
+
+    u8  running;
+    int timeout; // ms
+    int random;
+} global_t;
+
+int
+init_client(int argc, char **argv, global_t *global);
+void
+msleep(int ms);
+
+#endif
