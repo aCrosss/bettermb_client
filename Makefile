@@ -1,5 +1,5 @@
 SOURCES = $(shell find src/ -type f)
-LIBS    = -pthread -lncurses
+LIBS    = -pthread -lform -lncurses
 FLAGS   = -fsanitize=address
 
 all:

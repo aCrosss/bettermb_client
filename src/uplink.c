@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -6,7 +7,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "screen.h"
+#include "tui.h"
 #include "types.h"
 #include "uplink.h"
 
@@ -143,13 +144,25 @@ open_uplink(global_t *global) {
         return RC_FAIL;
     }
 
-    if (!set_socket_timeout(fd, global->timeout)) {
-        return RC_FAIL;
-    }
+    // doesn't work with file descriptors
+    // if (!set_socket_timeout(fd, global->response_timeout)) {
+    //     return RC_FAIL;
+    // }
 
     log_line("> fd set");
     global->cxt.fd = fd;
     return RC_SUCCESS;
+}
+
+int
+relink(global_t *global) {
+    // if something opened, close it
+    if (global->cxt.fd > 2) { // 0 - stdin, 1 - stdout, 2 - stderr
+        close(global->cxt.fd);
+    }
+
+    // reopen new socket
+    open_uplink(global);
 }
 
 int
@@ -159,7 +172,8 @@ set_socket_timeout(int fd, u32 ms) {
     timeout.tv_usec = (ms % 1000) * 1000;
 
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0) {
-        log_line("! failed to setsockopt");
+        log_linef("! failed to setsockopt: %d", errno);
+        ENOPROTOOPT;
         return RC_FAIL;
     }
 

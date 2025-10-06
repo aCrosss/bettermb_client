@@ -4,16 +4,16 @@
 #include "types.h"
 
 typedef struct {
-    char *device;
-    int   baud;
-    char  parity;
-    int   data_bits;
-    int   stop_bits;
+    char device[32];
+    int  baud;
+    char parity;
+    int  data_bits;
+    int  stop_bits;
 } serial_cfg;
 
 typedef struct {
-    const char *host;
-    int         tcp_port;
+    char host[16];
+    int  tcp_port;
 } tcp_endp;
 
 typedef struct {
@@ -59,5 +59,9 @@ int
 init_client(int argc, char **argv, global_t *global);
 void
 msleep(int ms);
+int
+sconf_from_str(serial_cfg *sconf, char *device, char *baud, char *dbits, char *sbits, const char *parity);
+int
+tcp_ednp_from_str(tcp_endp *tcp, char *host, char *port);
 
 #endif

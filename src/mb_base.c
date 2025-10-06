@@ -3,7 +3,7 @@
 
 #include "client_cxt.h"
 #include "mb_base.h"
-#include "screen.h"
+#include "tui.h"
 
 // ======================================================================================
 // Conversions
@@ -305,7 +305,7 @@ build_adu_rtu(u8 adu[MB_RTU_MAX_ADU_LEN], frame_t *frame) {
 }
 
 int
-mb_ascii_build_adu(u8 out_adu[MB_ASCII_MAX_ADU_LEN], frame_t *frame) {
+build_adu_ascii(u8 out_adu[MB_ASCII_MAX_ADU_LEN], frame_t *frame) {
     // binary buffer: Unit ID + Function Code + Data
     u8 bin[1 + 1 + MB_MAX_PDU_LEN];
 
@@ -356,7 +356,7 @@ int
 build_adu(u8 *adu, frame_t *frame) {
     switch (frame->protocol) {
     case MB_PROTOCOL_RTU  : return build_adu_rtu(adu, frame);
-    case MB_PROTOCOL_ASCII: return build_adu_rtu(adu, frame);
+    case MB_PROTOCOL_ASCII: return build_adu_ascii(adu, frame);
     case MB_PROTOCOL_TCP  : return build_adu_tcp(adu, frame);
     }
 

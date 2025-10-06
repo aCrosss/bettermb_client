@@ -6,7 +6,7 @@
 
 #include "client_cxt.h"
 #include "mb_base.h"
-#include "screen.h"
+#include "tui.h"
 #include "types.h"
 #include "uplink.h"
 

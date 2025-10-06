@@ -1,6 +1,7 @@
 #ifndef SCREEN_H
 #define SCREEN_H
 
+#include <form.h>
 #include <ncurses.h>
 
 #include "client_cxt.h"

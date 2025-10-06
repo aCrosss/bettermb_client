@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -7,6 +8,7 @@
 #include <unistd.h>
 
 #include "client_cxt.h"
+#include "tui.h"
 #include "uplink.h"
 
 void
@@ -257,6 +259,87 @@ handle_startup_args(int argc, char **argv, global_t *global) {
     return 1;
 }
 
+void
+trim_spaces(char *str) {
+    int len = strlen(str);
+    while (len > 0 && isspace((unsigned char)str[len - 1])) {
+        str[--len] = '\0';
+    }
+}
+
+int
+sconf_from_str(serial_cfg *sconf, char *device, char *baud, char *dbits, char *sbits, const char *parity) {
+    trim_spaces(device);
+    trim_spaces(baud);
+    trim_spaces(dbits);
+    trim_spaces(sbits);
+
+    if (access(device, F_OK) != 0) {
+        log_linef("! device doesn't exist: '%s'\n", device);
+        return RC_FAIL;
+    }
+    strncpy(sconf->device, device, 32);
+
+    if (parse_int(baud, &sconf->baud) < 0) {
+        return RC_FAIL;
+    } else if (sconf->baud < 0 || sconf->baud > 921600) {
+        log_line("! baudrate must be between 0 and 921600");
+        return RC_FAIL;
+    }
+
+    if (parse_int(dbits, &sconf->data_bits) < 0) {
+        return RC_FAIL;
+    } else if (sconf->data_bits < 5 || sconf->data_bits > 8) {
+        log_line("! data bits can be 5, 6, 7 or 8");
+        return RC_FAIL;
+    }
+
+    if (parse_int(sbits, &sconf->stop_bits) < 0) {
+        return RC_FAIL;
+    } else if (sconf->stop_bits < 1 || sconf->stop_bits > 2) {
+        log_linef("! stop bits can be 1 or 2, but got %d", sconf->stop_bits);
+        return RC_FAIL;
+    }
+
+    if (strcmp(parity, "N")) {
+        sconf->parity = 'N';
+    } else if (strcmp(parity, "O")) {
+        sconf->parity = 'O';
+    } else if (strcmp(parity, "E")) {
+        sconf->parity = 'V';
+    } else {
+        log_line("! invalid parity, can be N|O|E");
+        return RC_FAIL;
+    }
+
+    log_linef("");
+    log_linef("New serial config:");
+    log_linef("> device   : %s", sconf->device);
+    log_linef("> baud     : %d", sconf->baud);
+    log_linef("> data bits: %d", sconf->data_bits);
+    log_linef("> stop bits: %d", sconf->stop_bits);
+    log_linef("> parity   : %c", sconf->parity);
+    log_linef("");
+
+    return RC_SUCCESS;
+}
+
+int
+tcp_ednp_from_str(tcp_endp *tcp, char *host, char *port) {
+    trim_spaces(host);
+    trim_spaces(port);
+
+    // TODO: Validate ip
+    strncpy(tcp->host, host, 16);
+
+    if (parse_int(port, &tcp->tcp_port) < 0) {
+        log_linef("! invalid tcp port: %d", tcp->tcp_port);
+        return RC_FAIL;
+    }
+
+    return RC_SUCCESS;
+}
+
 int
 init_client(int argc, char **argv, global_t *global) {
     global->sconf.baud      = 115200;
@@ -301,15 +384,15 @@ init_client(int argc, char **argv, global_t *global) {
     }
 
     switch (global->cxt.protocol) {
-    case MB_PROTOCOL_TCP: global->tcp_endp.host = endp; break;
+    case MB_PROTOCOL_TCP: strncpy(global->tcp_endp.host, endp, 16); break;
     case MB_PROTOCOL_RTU:
     case MB_PROTOCOL_ASCII:
         if (access(endp, F_OK) != 0) {
-            printf("%s: device doesn't exist: '%s'\n", mode, endp);
+            log_linef("%s: device doesn't exist: '%s'\n", mode, endp);
             return RC_FAIL;
         }
 
-        global->sconf.device = endp;
+        strncpy(global->sconf.device, endp, 32);
         break;
     default: printf("Invalid modbus mode\n"); return -1;
     }

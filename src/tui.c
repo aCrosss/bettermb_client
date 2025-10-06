@@ -1,0 +1,495 @@
+#include <string.h>
+#include <unistd.h>
+
+#include "client_cxt.h"
+#include "mb_base.h"
+#include "tui.h"
+#include "uplink.h"
+
+global_t *pglobals;
+
+/* TO STRING SECTION */
+
+// Because ncurses filed's doesn't like numbers
+
+const char *
+str_baud(int baudrare) {
+    switch (baudrare) {
+    case 0    : return "0";
+    case 50   : return "50";
+    case 75   : return "75";
+    case 110  : return "110";
+    case 134  : return "134";
+    case 150  : return "150";
+    case 200  : return "200";
+    case 300  : return "300";
+    case 600  : return "600";
+    case 1200 : return "1200";
+    case 1800 : return "1800";
+    case 2400 : return "2400";
+    case 4800 : return "4800";
+    case 9600 : return "9600";
+    case 19200: return "19200";
+    case 38400: return "38400";
+    default   : return "19200";
+    }
+
+    return "19200";
+}
+
+const char *
+str_dbits(int db) {
+    switch (db) {
+    case 5: return "5";
+    case 6: return "6";
+    case 7: return "7";
+    case 8: return "8";
+
+    default: return "8";
+    }
+
+    return "8";
+}
+
+const char *
+str_sbits(int sp) {
+    if (sp == 2) {
+        return "2";
+    } else {
+        return "1";
+    }
+}
+
+const char *
+str_parity(int parity) {
+    switch (parity) {
+    case 'N': return "N";
+    case 'O': return "O";
+    case 'E': return "E";
+
+    default: return "N";
+    }
+
+    return "N";
+}
+
+/* TO STRING SECTION */
+
+WINDOW *wheader;
+WINDOW *wlog;
+
+log_t logd = {0};
+
+static const char *
+str_dirstat(dirstat_t ds) {
+    switch (ds) {
+    case DS_IN_OK   : return "->";
+    case DS_IN_FAIL : return "x>";
+    case DS_OUT_OK  : return "<-";
+    case DS_OUT_FAIL: return "<x";
+    }
+}
+
+void
+redraw_header(global_t *global) {
+    wclear(wheader);
+    box(wheader, 0, 0);
+
+    s8 endp[32];
+    str_curr_endpoint(endp, global);
+
+    mvwprintw(wheader, 1, 1, "1 | Protocol: %s", str_protocol(global->cxt.protocol));
+    mvwprintw(wheader, 2, 1, "2 | Endpoint: %s", endp);
+    mvwprintw(wheader, 3, 1, "3 | Unit IDs: %d", global->slave_id_start);
+    mvwprintw(wheader, 4, 1, "4 | Function: %s", str_fc(global->cxt.fc));
+    //
+    mvwprintw(wheader, 6, 1, "5 | Read address : 0x%04X", global->cxt.raddress);
+    mvwprintw(wheader, 7, 1, "6 | Read count   : %d", global->cxt.rcount);
+    mvwprintw(wheader, 8, 1, "7 | Write address: 0x%04X", global->cxt.waddress);
+    mvwprintw(wheader, 9, 1, "8 | Write count  : %d", global->cxt.wcount);
+    mvwprintw(wheader, 10, 1, "9 | Write Data  : ");
+
+    mvwprintw(wheader, 1, 64, "F5 | Running: %s", global->running ? "On" : "Off");
+    mvwprintw(wheader, 2, 64, "F6 | Random:  %s", global->random ? "On" : "Off");
+
+    int reqs      = global->stats.requests;
+    int successes = global->stats.success;
+    int fails     = global->stats.fails;
+    int timeouts  = global->stats.timeouts;
+    mvwprintw(wheader, 1, 96, "Requests:  %04d", reqs);
+
+    // won't affect real statistic output, but make crude 0 div safeguard
+    if (!reqs) {
+        reqs = 1;
+    }
+
+    mvwprintw(wheader, 2, 96, "Successed: %04d  %.2f%%", successes, (float)successes / reqs * 100);
+    mvwprintw(wheader, 3, 96, "Failed:    %04d  %.2f%%", fails, (float)fails / reqs * 100);
+    mvwprintw(wheader, 4, 96, "Timedout:  %04d  %.2f%%", timeouts, (float)timeouts / reqs * 100);
+
+    wrefresh(wheader);
+}
+
+static void
+redraw_log() {
+    wclear(wlog);
+
+    for (int i = 0; i < logd.linec; i++) {
+        mvwprintw(wlog, i, 0, "%s", logd.lines[i]);
+    }
+
+    wrefresh(wlog);
+}
+
+void
+init_screen(global_t *global) {
+    pglobals = global;
+
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE);
+    refresh();
+
+    // init header
+    u8 header_bottom = 16;
+    wheader          = newwin(header_bottom, COLS, 0, 0);
+    // box(wheader, 0, 0);
+    redraw_header(global);
+    // refresh();
+
+    // init logd
+    int rows      = LINES - header_bottom;
+    logd.max_rows = rows;
+    logd.linel    = COLS;
+    wlog          = newwin(rows, COLS, header_bottom, 0);
+    box(wlog, 0, 0);
+    redraw_log();
+}
+
+static void
+format_payload(u8 out[MAX_LINE_LEN], u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol) {
+    // so we can not to worry about null termination
+    memset(out, 0, 1024);
+
+    for (int i = 0; i < adu_len; i++) {
+        out[i * 3]     = nibble_to_hex((adu[i] >> 4) & 0x0F);
+        out[i * 3 + 1] = nibble_to_hex((adu[i] >> 0) & 0x0F);
+        out[i * 3 + 2] = ' ';
+    }
+}
+
+void
+log_adu(const char *endp, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds) {
+    u8 buff[MAX_LINE_LEN] = {0};
+
+    u8 left_side[MAX_LINE_LEN] = {0};
+    sprintf(left_side, "%s %s", endp, str_dirstat(ds));
+
+    u8 payload[1024];
+    format_payload(payload, adu, adu_len, protocol);
+    int payload_len = strlen(payload);
+
+    snprintf(buff, MAX_LINE_LEN - 1, "%s %s", left_side, payload);
+    buff[MAX_LINE_LEN - 1] = '\0';
+    // int cursor              = strlen(buff) - strlen(left_side);
+    // payload_len            -= cursor;
+
+    // log_line(buff);
+    // return;
+
+    int lines = strlen(buff) / COLS + 1;
+    for (int i = 0; i < lines; i++) {
+        u8 line_buff[MAX_LINE_LEN]  = {0};
+        // TODO: clamp between COLS and MAX LINE LEN
+        // snprintf(line_buff, COLS - 1, "%s", buff[i * COLS]);
+        line_buff[MAX_LINE_LEN - 1] = '\0';
+        memcpy(line_buff, &buff[i * COLS], MAX_LINE_LEN - (i * COLS));
+        printf("%d\n", COLS);
+        log_line(line_buff);
+    }
+}
+
+void
+log_line(const char *line) {
+    strncpy(logd.lines[logd.linec], line, MAX_LINE_LEN - 1);
+    logd.lines[logd.linec][MAX_LINE_LEN - 1] = '\0';
+
+    // shift all lines one up if too much, drop top one
+    if (logd.linec == logd.max_rows - 1) {
+        for (int i = 0; i < logd.max_rows; i++) {
+            strncpy(logd.lines[i], logd.lines[i + 1], MAX_LINE_LEN);
+        }
+        logd.linec--;
+    }
+
+    logd.linec++;
+
+    redraw_log();
+}
+
+void
+log_linef(const char *format, ...) {
+    u8 buff[MAX_LINE_LEN] = {0};
+
+    va_list va;
+    va_start(va, format);
+    vsnprintf(buff, MAX_LINE_LEN, format, va);
+    va_end(va);
+
+    log_line(buff);
+}
+
+// =============================================================================
+// TUI
+// =============================================================================
+
+char *field_enum_baud[] = {
+  "0",
+  "50",
+  "75",
+  "110",
+  "134",
+  "150",
+  "200",
+  "300",
+  "600",
+  "1200",
+  "1800",
+  "2400",
+  "4800",
+  "9600",
+  "19200",
+  "38400",
+  NULL,
+};
+
+char *field_enum_dbits[] = {
+  "5",
+  "6",
+  "7",
+  "8",
+  NULL,
+};
+
+char *field_enum_sbits[] = {
+  "1",
+  "2",
+  NULL,
+};
+
+char *field_enum_parity[] = {
+  "N",
+  "O",
+  "E",
+  NULL,
+};
+
+void
+tui_endpoint_legend(WINDOW *win, mb_protocol_t procol, u8 pos) {
+    if (procol == MB_PROTOCOL_TCP) {
+        mvwprintw(win, 0, 1, "TCP Endpoint");
+        mvwprintw(win, 1, 1, "%sHost:   ", pos == 0 ? "*" : " ");
+        mvwprintw(win, 2, 1, "%sPort: ", pos == 1 ? "*" : " ");
+
+        mvwprintw(win, 8, 1, "F1 - Submit");
+        mvwprintw(win, 9, 1, "F2 - Cancel");
+    } else {
+        mvwprintw(win, 0, 1, "Serial Endpoint");
+        mvwprintw(win, 1, 1, "%sDevice:   ", pos == 0 ? "*" : " ");
+        mvwprintw(win, 2, 1, "%sBaudrate: ", pos == 1 ? "*" : " ");
+        mvwprintw(win, 3, 1, "%sData bits:", pos == 2 ? "*" : " ");
+        mvwprintw(win, 4, 1, "%sStop bits:", pos == 3 ? "*" : " ");
+        mvwprintw(win, 5, 1, "%sParity:   ", pos == 4 ? "*" : " ");
+        // mvwprintw(win, 7, 1, "Status ok");
+        mvwprintw(win, 8, 1, "F1 - Submit");
+        mvwprintw(win, 9, 1, "F2 - Cancel");
+    }
+}
+
+void
+tui_endpoint(global_t *global) {
+    FIELD *field[6];
+    FORM  *fendp;
+    u8     nfields = 5; // Magic number but fine; it's maximum filed for both Serial and TCP
+    s8     pos     = 0;
+
+    //                     h   w   y              x
+    WINDOW *wendp = newwin(11, 32, LINES / 2 - 5, COLS / 2 - 16);
+    keypad(wendp, TRUE);
+
+    if (global->cxt.protocol == MB_PROTOCOL_TCP) {
+        nfields  = 2;
+        // host field
+        field[0] = new_field(1, 14, 0, 0, 0, 0);
+        set_field_back(field[0], A_UNDERLINE);
+        set_field_buffer(field[0], 0, global->tcp_endp.host);
+        // port field
+        field[1] = new_field(1, 14, 1, 0, 0, 0);
+        set_field_back(field[1], A_UNDERLINE);
+        set_field_type(field[1], TYPE_INTEGER, 0, 0, 65535);
+        char buff[16] = {0};
+        snprintf(buff, 16, "%d", global->tcp_endp.tcp_port);
+        set_field_buffer(field[1], 0, buff);
+
+        field[2] = NULL;
+    } else {
+        for (u8 i = 0; i < nfields; i++) {
+            field[i] = new_field(1, 14, i, 0, 0, 0);
+        }
+        // device field
+        set_field_back(field[0], A_UNDERLINE);
+        set_field_buffer(field[0], 0, global->sconf.device);
+        // baud field
+        set_field_type(field[1], TYPE_ENUM, field_enum_baud, 0, 0);
+        set_field_buffer(field[1], 0, str_baud(global->sconf.baud));
+        // data bits field
+        set_field_type(field[2], TYPE_ENUM, field_enum_dbits, 0, 0);
+        set_field_buffer(field[2], 0, str_dbits(global->sconf.data_bits));
+        // stop bits field
+        set_field_type(field[3], TYPE_ENUM, field_enum_sbits, 0, 0);
+        set_field_buffer(field[3], 0, str_sbits(global->sconf.stop_bits));
+        // parity field
+        set_field_type(field[4], TYPE_ENUM, field_enum_parity, 0, 0);
+        set_field_buffer(field[4], 0, str_parity(global->sconf.parity));
+
+        field[5] = NULL;
+    }
+
+    fendp = new_form(field);
+    set_form_win(fendp, wendp); //    h  w   y  x
+    set_form_sub(fendp, derwin(wendp, 5, 16, 1, 13));
+    post_form(fendp);
+
+    // TODO: TMP
+    box(wendp, 0, 0);
+    tui_endpoint_legend(wendp, global->cxt.protocol, 0);
+    wrefresh(wendp);
+
+    while (1) {
+        int ch = wgetch(wendp);
+
+        switch (ch) {
+        case KEY_DOWN:
+            pos = (pos + 1) % nfields;
+            form_driver(fendp, REQ_NEXT_FIELD);
+            tui_endpoint_legend(wendp, global->cxt.protocol, pos);
+            break;
+
+        case KEY_UP:
+            pos--;
+            if (pos < 0) {
+                pos = nfields - 1;
+            }
+            form_driver(fendp, REQ_PREV_FIELD);
+            tui_endpoint_legend(wendp, global->cxt.protocol, pos);
+            break;
+
+        case KEY_LEFT : form_driver(fendp, REQ_PREV_CHOICE); break;
+        case KEY_RIGHT: form_driver(fendp, REQ_NEXT_CHOICE); break;
+
+        case KEY_BACKSPACE: form_driver(fendp, REQ_DEL_PREV); break;
+
+        // cancel
+        case KEY_F(2):
+            unpost_form(fendp);
+            free_form(fendp);
+            for (int i = 0; i < nfields; i++) {
+                free_field(field[i]);
+            }
+            delwin(wendp);
+            redraw_log();
+            return; // we're done
+
+        // try submit
+        case KEY_F(1):
+            if (global->cxt.protocol == MB_PROTOCOL_TCP) {
+                tcp_endp tcp = {0};
+                if (tcp_ednp_from_str(&tcp, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
+                    memcpy(&global->tcp_endp, &tcp, sizeof(tcp));
+                    //  global->sconf = new_conf;
+
+                    unpost_form(fendp);
+                    free_form(fendp);
+                    for (int i = 0; i < nfields; i++) {
+                        free_field(field[i]);
+                    }
+                    delwin(wendp);
+                    redraw_log();
+                    relink(global);
+                    return; // we're done
+                }
+            } else {
+                serial_cfg new_conf = {0};
+                if (sconf_from_str(&new_conf,
+                                   field_buffer(field[0], 0),
+                                   field_buffer(field[1], 0),
+                                   field_buffer(field[2], 0),
+                                   field_buffer(field[3], 0),
+                                   field_buffer(field[4], 0))) {
+                    memcpy(&global->sconf, &new_conf, sizeof(new_conf));
+                    //  global->sconf = new_conf;
+
+                    unpost_form(fendp);
+                    free_form(fendp);
+                    for (int i = 0; i < nfields; i++) {
+                        free_field(field[i]);
+                    }
+                    delwin(wendp);
+                    redraw_log();
+                    relink(global);
+                    return; // we're done
+                }
+                // serial config is bad, just continue with this window
+                break;
+            }
+
+        default: form_driver(fendp, ch); break;
+        }
+    }
+}
+
+void
+handle_user_input() {
+    // ?
+}
+
+void *
+input_thread(void *global) {
+    global_t *g = (global_t *)global;
+
+    while (1) {
+        int key = getch();
+        if (key == ERR) {
+            continue;
+        }
+
+        log_linef("> %d pressed", key);
+        // TUI shouldn't change anything while client actualy running requests
+        if (g->running && key != KEY_F(5)) {
+            continue;
+        }
+
+        switch (key) {
+        case KEY_1:
+            log_line("1 pressed");
+            g->cxt.protocol = (g->cxt.protocol + 1) % MB_PROTOCOL_MAX;
+            break;
+        case KEY_2: tui_endpoint(g); break;
+        case KEY_3: break;
+
+        case KEY_F(5):
+            log_line("F5 pressed");
+            g->running = ~g->running;
+            break;
+
+        case KEY_F(6):
+            log_line("F6 pressed");
+            g->random = ~g->random;
+            break;
+        }
+
+        redraw_header(g);
+    }
+}
