@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "client_cxt.h"
+#include "helping_hand.h"
 #include "mb_base.h"
 #include "tui.h"
 
@@ -9,79 +9,12 @@
 // Conversions
 // ======================================================================================
 
-char
-nibble_to_hex(u8 d) {
-    char c = 0;
-
-    if (d < 10) {
-        c = d + '0';
-    } else {
-        c = d - 10 + 'A';
-    }
-
-    return c;
-}
-
-int
-hex_to_nibble(char c) {
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    } else if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    } else if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    }
-    return -1;
-}
-
-u8
-hex_to_digit(char ch1, char ch2) {
-    u8 hi = hex_to_nibble(ch1);
-    u8 lo = hex_to_nibble(ch2);
-    return (hi << 4) | (lo << 0);
-}
-
 const char *
 str_protocol(mb_protocol_t protocol) {
     switch (protocol) {
     case MB_PROTOCOL_RTU  : return "RTU";
     case MB_PROTOCOL_ASCII: return "ASCII";
     case MB_PROTOCOL_TCP  : return "TCP";
-    }
-}
-
-// TODO: Magic number
-void
-str_curr_endpoint(char out[32], global_t *global) {
-    memset(out, 0, 32);
-
-    // if (!global->cxt.protocol) {
-    //     log_line("! protocol undefined");
-    //     snprintf(out, 32, "<null>");
-    //     return;
-    // }
-
-    switch (global->cxt.protocol) {
-    case MB_PROTOCOL_RTU:
-    case MB_PROTOCOL_ASCII:
-        if (!global->sconf.device) {
-            log_line("! serial endpoint undefined");
-            snprintf(out, 32, "<null>");
-            break;
-        }
-
-        strncpy(out, global->sconf.device, 32);
-        break;
-
-    case MB_PROTOCOL_TCP:
-        if (!global->tcp_endp.host || !global->tcp_endp.tcp_port) {
-            log_line("! TCP endpoint undefined");
-            snprintf(out, 32, "<null>");
-            break;
-        }
-
-        snprintf(out, 32, "%s:%d", global->tcp_endp.host, global->tcp_endp.tcp_port);
-        break;
     }
 }
 

@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include "client_cxt.h"
+#include "helping_hand.h"
 #include "mb_base.h"
 #include "tui.h"
 #include "uplink.h"
@@ -10,7 +11,7 @@ global_t *pglobals;
 
 /* TO STRING SECTION */
 
-// Because ncurses filed's doesn't like numbers
+// Because ncurses fields doesn't like numbers
 
 const char *
 str_baud(int baudrare) {
