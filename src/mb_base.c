@@ -362,6 +362,268 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
 }
 
 // =============================================================================
+// Calculate expected ADU length
+// =============================================================================
+
+int
+mb_fc_is_valid(fc_t fc, mb_dir_t dir) {
+    // handle exception function code
+    if (fc >= 0x80) {
+        if (dir == MB_DIR_REQUEST) {
+            return 0;
+        }
+        fc -= 0x80;
+    }
+
+    switch (fc) {
+    case MB_FC_READ_COILS:
+    case MB_FC_READ_DISCRETE_INPUTS:
+    case MB_FC_READ_HOLDING_REGISTERS:
+    case MB_FC_READ_INPUT_REGISTERS:
+    case MB_FC_WRITE_SINGLE_COIL:
+    case MB_FC_WRITE_SINGLE_REGISTER:
+    case MB_FC_WRITE_MULTIPLE_COILS:
+    case MB_FC_WRITE_MULTIPLE_REGISTERS:
+    case MB_FC_WRITE_AND_READ_REGISTERS: return 1;
+    }
+
+    return 0;
+}
+
+int
+mb_compute_meta_len(fc_t fc, mb_dir_t dir) {
+    int len = 0;
+
+    if (dir == MB_DIR_REQUEST) {
+        switch (fc) {
+        case MB_FC_READ_COILS:
+        case MB_FC_READ_DISCRETE_INPUTS:
+        case MB_FC_READ_INPUT_REGISTERS:
+        case MB_FC_READ_HOLDING_REGISTERS:
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER   : len = 5; break;
+        case MB_FC_WRITE_MULTIPLE_COILS    :
+        case MB_FC_WRITE_MULTIPLE_REGISTERS: len = 6; break;
+        case MB_FC_WRITE_AND_READ_REGISTERS: len = 10; break;
+        }
+    }
+    // dir == MB_DIR_RESPONSE
+    else {
+        switch (fc) {
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER:
+        case MB_FC_WRITE_MULTIPLE_COILS:
+        case MB_FC_WRITE_MULTIPLE_REGISTERS: len = 5; break;
+        default                            : len = 2;
+        }
+    }
+
+    return len;
+}
+
+int
+mb_compute_data_len_offset(fc_t fc, mb_dir_t dir) {
+    int offset = -1;
+    if (dir == MB_DIR_REQUEST) {
+        switch (fc) {
+        case MB_FC_WRITE_MULTIPLE_COILS:
+        case MB_FC_WRITE_MULTIPLE_REGISTERS: offset = 5; break;
+        case MB_FC_WRITE_AND_READ_REGISTERS: offset = 9; break;
+
+        case MB_FC_READ_COILS:
+        case MB_FC_READ_DISCRETE_INPUTS:
+        case MB_FC_READ_INPUT_REGISTERS:
+        case MB_FC_READ_HOLDING_REGISTERS:
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER : break;
+        }
+    }
+    // dir == MB_DIR_RESPONSE
+    else {
+        switch (fc) {
+        case MB_FC_READ_COILS:
+        case MB_FC_READ_DISCRETE_INPUTS:
+        case MB_FC_READ_INPUT_REGISTERS:
+        case MB_FC_READ_HOLDING_REGISTERS:
+        case MB_FC_WRITE_AND_READ_REGISTERS: offset = 1; break;
+
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER:
+        case MB_FC_WRITE_MULTIPLE_COILS:
+        case MB_FC_WRITE_MULTIPLE_REGISTERS: break;
+        }
+    }
+
+    return offset;
+}
+
+int
+mb_has_data(fc_t fc, mb_dir_t dir) {
+    if (dir == MB_DIR_REQUEST) {
+        switch (fc) {
+        case MB_FC_WRITE_MULTIPLE_COILS:
+        case MB_FC_WRITE_MULTIPLE_REGISTERS:
+        case MB_FC_WRITE_AND_READ_REGISTERS: return 1;
+
+        case MB_FC_READ_COILS:
+        case MB_FC_READ_DISCRETE_INPUTS:
+        case MB_FC_READ_HOLDING_REGISTERS:
+        case MB_FC_READ_INPUT_REGISTERS:
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER : return 0;
+        }
+    }
+    // dir == MB_DIR_RESPONSE
+    else {
+        // exceptions are 1-byte payload
+        if (fc >= 0x80) {
+            return 1;
+        }
+
+        switch (fc) {
+        case MB_FC_READ_COILS:
+        case MB_FC_READ_DISCRETE_INPUTS:
+        case MB_FC_READ_HOLDING_REGISTERS:
+        case MB_FC_READ_INPUT_REGISTERS:
+        case MB_FC_WRITE_AND_READ_REGISTERS: return 1;
+
+        case MB_FC_WRITE_SINGLE_COIL:
+        case MB_FC_WRITE_SINGLE_REGISTER:
+        case MB_FC_WRITE_MULTIPLE_COILS:
+        case MB_FC_WRITE_MULTIPLE_REGISTERS: return 0;
+        }
+    }
+
+    return 0;
+}
+
+int
+mb_rtu_get_expected_adu_len(u8 *adu, int have, mb_dir_t dir) {
+    if (have < MB_RTU_MIN_ADU_LEN) {
+        // incomplete ADU, can't determine the length yet
+        return 0;
+    }
+
+    fc_t fc = adu[MB_RTU_HDR_LEN];
+    if (!mb_fc_is_valid(fc, dir)) {
+        // invalid function code
+        return -1;
+    }
+
+    int meta_len = mb_compute_meta_len(fc, dir);
+    if (have < MB_RTU_ADU_LEN(meta_len)) {
+        // incomplete ADU, can't determine the length yet
+        return 0;
+    }
+
+    if (!mb_has_data(fc, dir)) {
+        // fixed-length PDU
+        return MB_RTU_ADU_LEN(meta_len);
+    }
+
+    int offset = mb_compute_data_len_offset(fc, dir);
+    if (offset < 0) {
+        // invalid function code
+        return -1;
+    }
+
+    if (MB_RTU_HDR_LEN + offset + 1 > have) {
+        // incomplete ADU, can't read data len yet
+        return 0;
+    }
+
+    int data_len = adu[MB_RTU_HDR_LEN + offset];
+    int total    = MB_RTU_ADU_LEN(meta_len + data_len);
+
+    if (total < MB_RTU_MIN_ADU_LEN || total > MB_RTU_MAX_ADU_LEN) {
+        // invalid ADU length
+        return -1;
+    }
+    return total;
+}
+
+int
+mb_ascii_get_expected_adu_len(u8 *adu, int have, mb_dir_t dir) {
+    if (have < MB_ASCII_MIN_ADU_LEN) {
+        // incomplete ADU, can't determine the length yet
+        return 0;
+    }
+
+    fc_t fc = hex_to_digit(adu[MB_ASCII_HDR_LEN + 0], adu[MB_ASCII_HDR_LEN + 1]);
+    if (!mb_fc_is_valid(fc, dir)) {
+        // invalid function code
+        return -1;
+    }
+
+    int meta_len = mb_compute_meta_len(fc, dir);
+    if (have < MB_ASCII_ADU_LEN(meta_len)) {
+        // incomplete ADU, can't determine the length yet
+        return 0;
+    }
+
+    if (!mb_has_data(fc, dir)) {
+        return MB_ASCII_ADU_LEN(meta_len);
+    }
+
+    int offset = mb_compute_data_len_offset(fc, dir);
+    if (offset < 0) {
+        // invalid function code
+        return -1;
+    }
+
+    if (MB_ASCII_HDR_LEN + 2 * (offset + 1) > have) {
+        // incomplete ADU, can't read data len yet
+        return 0;
+    }
+
+    int data_len = hex_to_digit(adu[MB_ASCII_HDR_LEN + 2 * offset + 0], adu[MB_ASCII_HDR_LEN + 2 * offset + 1]);
+    int total    = MB_ASCII_ADU_LEN(meta_len + data_len);
+
+    if (total < MB_ASCII_MIN_ADU_LEN || total > MB_ASCII_MAX_ADU_LEN) {
+        // invalid ADU length
+        return -1;
+    }
+    return total;
+}
+
+int
+mb_tcp_get_expected_adu_len(u8 *adu, int have) {
+    if (have < (MB_TCP_HDR_LEN - 1)) {
+        // incomplete ADU, can't determine the length yet
+        return 0;
+    }
+
+    u16 pid = (adu[2] << 8) | (adu[3] << 0);
+    if (pid != 0x0000) {
+        // invalid protocol ID
+        return -1;
+    }
+
+    u16 mbap_len = (adu[4] << 8) | (adu[5] << 0);
+    int total    = (MB_TCP_HDR_LEN - 1) + mbap_len;
+
+    if (mbap_len < 1 + MB_TCP_MIN_PDU_LEN) {
+        // sanity check
+        return -1;
+    }
+
+    if (total > MB_TCP_MAX_ADU_LEN) {
+        return -1;
+    }
+    return (have >= total) ? total : 0;
+}
+
+int
+mb_get_expected_adu_len(mb_protocol_t proto, u8 *adu, int adu_len, mb_dir_t dir) {
+    switch (proto) {
+    case MB_PROTOCOL_RTU  : return mb_rtu_get_expected_adu_len(adu, adu_len, dir);
+    case MB_PROTOCOL_ASCII: return mb_ascii_get_expected_adu_len(adu, adu_len, dir);
+    case MB_PROTOCOL_TCP  : return mb_tcp_get_expected_adu_len(adu, adu_len);
+    }
+    return -1;
+}
+
+// =============================================================================
 // Extract frame from ADU
 // =============================================================================
 

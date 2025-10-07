@@ -186,8 +186,19 @@ format_payload(u8 out[MAX_LINE_LEN], u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_pro
 }
 
 void
-log_adu(const char *endp, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds) {
-    u8 buff[MAX_LINE_LEN] = {0};
+log_traffic_str(global_t *g, const char *str, dirstat_t ds) {
+    u8   buff[MAX_LINE_LEN] = {0};
+    char endp[32]           = {0};
+    str_curr_endpoint(endp, g);
+
+    log_linef("%s %s <!%s>", endp, str_dirstat(ds), str);
+}
+
+void
+log_adu(global_t *g, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds) {
+    u8   buff[MAX_LINE_LEN] = {0};
+    char endp[32]           = {0};
+    str_curr_endpoint(endp, g);
 
     u8 left_side[MAX_LINE_LEN] = {0};
     sprintf(left_side, "%s %s", endp, str_dirstat(ds));
@@ -253,22 +264,24 @@ log_linef(const char *format, ...) {
 // ---------------------------- Endpoint ---------------------------------------
 
 char *field_enum_baud[] = {
-  "0",
-  "50",
-  "75",
-  "110",
-  "134",
-  "150",
-  "200",
-  "300",
-  "600",
-  "1200",
-  "1800",
-  "2400",
-  "4800",
-  "9600",
-  "19200",
-  "38400",
+  "0",      //
+  "50",     //
+  "75",     //
+  "110",    //
+  "134",    //
+  "150",    //
+  "200",    //
+  "300",    //
+  "600",    //
+  "1200",   //
+  "1800",   //
+  "2400",   //
+  "4800",   //
+  "9600",   //
+  "19200",  //
+  "38400",  //
+  "57600",  //
+  "115200", //
   NULL,
 };
 
@@ -619,30 +632,20 @@ input_thread(void *global) {
             continue;
         }
 
-        log_linef("> %d pressed", key);
         // TUI shouldn't change anything while client actualy running requests
         if (g->running && key != KEY_F(5)) {
             continue;
         }
 
         switch (key) {
-        case KEY_1:
-            log_line("1 pressed");
-            g->cxt.protocol = (g->cxt.protocol + 1) % MB_PROTOCOL_MAX;
-            break;
+        case KEY_1: g->cxt.protocol = (g->cxt.protocol + 1) % MB_PROTOCOL_MAX; break;
         case KEY_2: tui_endpoint(g); break;
         case KEY_3: tui_uid(g); break;
         case KEY_4: tui_fc(g); break;
 
-        case KEY_F(5):
-            log_line("F5 pressed");
-            g->running = ~g->running;
-            break;
+        case KEY_F(5): g->running = ~g->running; break;
 
-        case KEY_F(6):
-            log_line("F6 pressed");
-            g->random = ~g->random;
-            break;
+        case KEY_F(6): g->random = ~g->random; break;
         }
 
         redraw_header(g);

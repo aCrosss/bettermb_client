@@ -220,7 +220,7 @@ str_curr_endpoint(char out[32], global_t *global) {
 // ================================================================================
 
 u64
-mb_tw_now_ms(void) {
+now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (u64)ts.tv_sec * 1000ull + (u64)ts.tv_nsec / 1000000ull;

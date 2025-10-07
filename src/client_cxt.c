@@ -1,3 +1,4 @@
+#define __USE_POSIX199309
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
@@ -278,7 +279,7 @@ init_client(int argc, char **argv, global_t *global) {
     global->cxt.waddress = 0;
     global->cxt.wcount   = 1;
 
-    global->response_timeout = 500;
+    global->response_timeout = 100;
     global->random           = 0;
     global->request_count    = 1;
     global->timeout          = 1000;

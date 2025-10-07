@@ -45,6 +45,8 @@ log_line(const char *line);
 void
 log_linef(const char *format, ...);
 void
-log_adu(const char *endp, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds);
+log_traffic_str(global_t *g, const char *str, dirstat_t ds);
+void
+log_adu(global_t *g, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds);
 
 #endif

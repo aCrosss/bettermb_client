@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <termios.h>
@@ -37,9 +38,7 @@ get_baud(int baud) {
 
 static int
 open_serial(serial_cfg *sconf) {
-    log_line("> opening serial...");
-
-    int fd = open(sconf->device, O_RDWR | O_NOCTTY);
+    int fd = open(sconf->device, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) {
         log_line("! failed to oped fd");
         return RC_ERROR;
@@ -93,7 +92,7 @@ open_serial(serial_cfg *sconf) {
     }
 
     char buff[64] = {0};
-    sprintf(buff, "> openned serial %d", fd);
+    sprintf(buff, "> openned serial connection: %d", fd);
     log_line(buff);
 
     // log_line("> openned serial");
@@ -102,10 +101,9 @@ open_serial(serial_cfg *sconf) {
 
 int
 open_tcp(tcp_endp *endp) {
-    log_line("> opening tcp...");
-    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | O_NONBLOCK, 0);
     if (fd < 0) {
-        log_line("! failed to oped fd");
+        log_linef("! failed to oped fd: %s", strerror(errno));
         return RC_ERROR;
     }
 
@@ -118,13 +116,15 @@ open_tcp(tcp_endp *endp) {
     };
 
     if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-        log_line("! failed to bind socket");
-        close(fd);
-        return RC_ERROR;
+        if (errno != EINPROGRESS) {
+            log_linef("! failed to bind socket: %s", strerror(errno));
+            close(fd);
+            return RC_ERROR;
+        }
     }
 
     char buff[64] = {0};
-    sprintf(buff, "> oppened socket (%d): %s:%d", fd, endp->host, endp->tcp_port);
+    sprintf(buff, "> oppened tcp connection (%d): %s:%d", fd, endp->host, endp->tcp_port);
     log_line(buff);
 
     return fd;
@@ -149,7 +149,6 @@ open_uplink(global_t *global) {
     //     return RC_FAIL;
     // }
 
-    log_line("> fd set");
     global->cxt.fd = fd;
     return RC_SUCCESS;
 }
@@ -161,6 +160,7 @@ relink(global_t *global) {
         close(global->cxt.fd);
     }
 
+    log_linef("> reopening connection");
     // reopen new socket
     open_uplink(global);
 }

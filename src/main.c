@@ -1,10 +1,12 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include "client_cxt.h"
+#include "helping_hand.h"
 #include "mb_base.h"
 #include "tui.h"
 #include "types.h"
@@ -37,55 +39,85 @@ send_request(frame_t *frame) {
         return RC_FAIL;
     }
 
+    // clear all pesky leftovers
+    u8 garbage[MB_MAX_ADU_LEN];
+    read(globals.cxt.fd, &garbage, MB_MAX_ADU_LEN);
+
     globals.stats.requests++;
     int bytes_send = write(globals.cxt.fd, adu, adu_len);
     // int bytes_send = send(globals.cxt.fd, adu, adu_len, 0);
     if (bytes_send > 0) {
-        char endp[32] = {0};
-        str_curr_endpoint(endp, &globals);
-        log_adu(endp, adu, adu_len, frame->protocol, DS_OUT_OK);
+        log_adu(&globals, adu, adu_len, frame->protocol, DS_OUT_OK);
         return RC_SUCCESS;
     } else {
         // TOOD: make more informative error message
-        log_line("! failed to send request");
+        log_traffic_str(&globals, "failed to send", DS_OUT_FAIL);
         return RC_FAIL;
     }
 }
 
 int
-recv_response(frame_t *req_frame) {
-    u8 adu[MB_MAX_ADU_LEN] = {0};
+read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u64 tstart) {
+    u32 pos      = 0;
+    u32 expected = 0;
 
-    int adu_len = read(globals.cxt.fd, adu, MB_MAX_ADU_LEN);
-    // int adu_len = recv(globals.cxt.fd, adu, MB_MAX_ADU_LEN, 0);
-    if (adu_len < 0) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            // timed out
-            log_line("! response timed out");
+    while (1) {
+        expected = mb_get_expected_adu_len(globals.cxt.protocol, out, pos, MB_DIR_RESPONSE);
+        if (expected < 0) {
+            return RC_FAIL;
+        }
+        if (expected == 0) {
+            expected = MB_MAX_ADU_LEN;
+        }
+
+        int add = read(globals.cxt.fd, &out[pos], expected);
+        if (add > 0) {
+            pos += add;
+        }
+
+        if (now_ms() - tstart > globals.response_timeout) {
+            log_traffic_str(&globals, "timed out", DS_IN_FAIL);
             globals.stats.timeouts++;
             return RC_FAIL;
-        } else {
-            // realy screwed
-            globals.stats.fails++;
-            log_line("! response error");
         }
+
+        if (pos >= expected) {
+            *out_len = pos;
+            return RC_SUCCESS;
+        }
+    }
+}
+
+int
+recv_response(frame_t *req_frame) {
+    // (almost) immediately after message sent, can count time for response arrival
+    u64 start = now_ms();
+
+    u8  adu[MB_MAX_ADU_LEN] = {0};
+    int adu_len             = 0;
+
+    if (!read_nonblock(adu, &adu_len, start)) {
+        return RC_FAIL;
     }
 
     if (!mb_is_adu_valid(req_frame->protocol, adu, adu_len)) {
         frame_t rsp_frame = {0};
         mb_extract_frame(req_frame->protocol, adu, adu_len, &rsp_frame);
 
+        // can be response that we already count as 'timed out, skip it
+        if (req_frame->tid != rsp_frame.tid) {
+            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
+            log_linef("get %d tid, expected %d", rsp_frame.tid, req_frame->tid);
+            return RC_FAIL;
+        }
+
         if (check_req_rsp_pdu(req_frame->pdu, req_frame->pdu_len, rsp_frame.pdu, rsp_frame.pdu_len)) {
-            char endp[32] = {0};
-            str_curr_endpoint(endp, &globals);
-            log_adu(endp, adu, adu_len, rsp_frame.protocol, DS_IN_OK);
+            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_OK);
             globals.stats.success++;
             return RC_SUCCESS;
         } else {
             // 192.168.5.225:502 <x failed to send requesto
-            char endp[32] = {0};
-            str_curr_endpoint(endp, &globals);
-            log_adu(endp, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
+            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
             globals.stats.fails++;
             log_line("! recieved response is invalid");
             return RC_FAIL;
@@ -102,7 +134,7 @@ make_request() {
     frame_t frame = {
       .protocol = globals.cxt.protocol,
       .fc       = globals.cxt.fc,
-      .uid      = 1,
+      .uid      = globals.slave_id_start,
       .tid      = tid,
     };
 

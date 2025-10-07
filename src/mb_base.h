@@ -14,6 +14,11 @@ typedef enum {
     MB_VALIDATION_ERROR_BAD_PROTO_ID = -6,
 } mb_validation_err_t;
 
+typedef enum {
+    MB_DIR_REQUEST  = 0, // master->slave (indication)
+    MB_DIR_RESPONSE = 1, // slave->master (confirmation)
+} mb_dir_t;
+
 typedef struct func_cxt {
     fc_t fc;
     u8   waddress;
@@ -39,6 +44,8 @@ int
 build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata);
 int
 build_adu(u8 *adu, frame_t *frame);
+int
+mb_get_expected_adu_len(mb_protocol_t proto, u8 *adu, int adu_len, mb_dir_t dir);
 void
 mb_extract_frame(mb_protocol_t proto, u8 *adu, int adu_len, frame_t *out);
 mb_validation_err_t
