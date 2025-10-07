@@ -63,5 +63,7 @@ int
 sconf_from_str(serial_cfg *sconf, char *device, char *baud, char *dbits, char *sbits, const char *parity);
 int
 tcp_ednp_from_str(tcp_endp *tcp, char *host, char *port);
+int
+uid_from_str(int *start, int *end, char *s_start, char *s_end);
 
 #endif
