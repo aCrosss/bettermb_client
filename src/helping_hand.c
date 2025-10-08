@@ -164,8 +164,7 @@ uid_from_str(int *start, int *end, char *s_start, char *s_end) {
     if (parse_int(s_start, start) < 0) {
         log_linef("! invalid uid start: %d", *start);
         return RC_FAIL;
-    }
-    if (*start < 0 || *start > 255) {
+    } else if (*start < 0 || *start > 255) {
         log_linef("! uid start must be between 0 and 255: %d", *start);
         return RC_FAIL;
     }
@@ -173,8 +172,7 @@ uid_from_str(int *start, int *end, char *s_start, char *s_end) {
     if (parse_int(s_end, end) < 0) {
         log_linef("! invalid uid end: %d", *end);
         return RC_FAIL;
-    }
-    if (*end < 0 || *end > 255) {
+    } else if (*end < 0 || *end > 255) {
         log_linef("! uid end must be between 0 and 255: %d", *end);
         return RC_FAIL;
     }
@@ -183,6 +181,40 @@ uid_from_str(int *start, int *end, char *s_start, char *s_end) {
         log_linef("! start must be less or equal to end");
         return RC_FAIL;
     }
+
+    return RC_SUCCESS;
+}
+
+int
+qnt_addr_from_str(int *ra, int *rc, int *wa, int *wc, char *sra, char *src, char *swa, char *swc) {
+    trim_spaces(sra);
+    trim_spaces(src);
+    trim_spaces(swa);
+    trim_spaces(swc);
+
+    if (parse_int(sra, ra) < 0) {
+        log_linef("! invalid read address: %d", *sra);
+        return RC_FAIL;
+    }
+
+    if (parse_int(src, rc) < 0) {
+        log_linef("! invalid read address: %d", *src);
+        return RC_FAIL;
+    }
+
+    if (parse_int(swa, wa) < 0) {
+        log_linef("! invalid read address: %d", *swa);
+        return RC_FAIL;
+    }
+
+    if (parse_int(swc, wc) < 0) {
+        log_linef("! invalid read address: %d", *swc);
+        return RC_FAIL;
+    }
+    // Note: upper and above 0 boundaries should be handled by tui, make other checks
+    // is pointless and better to lay it on pdu and adu building functions and endpoint's
+    // request validation. worse case scenarion should be: user fails with request
+    // building or response and change this settings
 
     return RC_SUCCESS;
 }

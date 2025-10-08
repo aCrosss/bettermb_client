@@ -109,13 +109,14 @@ redraw_header(global_t *global) {
     mvwprintw(wheader, 4, 1, "4 | Function: %s", str_fc(global->cxt.fc));
     //
     mvwprintw(wheader, 6, 1, "5 | Read address : 0x%04X", global->cxt.raddress);
-    mvwprintw(wheader, 7, 1, "6 | Read count   : %d", global->cxt.rcount);
-    mvwprintw(wheader, 8, 1, "7 | Write address: 0x%04X", global->cxt.waddress);
-    mvwprintw(wheader, 9, 1, "8 | Write count  : %d", global->cxt.wcount);
-    mvwprintw(wheader, 10, 1, "9 | Write Data  : ");
+    mvwprintw(wheader, 7, 1, "  | Read count   : %d", global->cxt.rcount);
+    mvwprintw(wheader, 8, 1, "  | Write address: 0x%04X", global->cxt.waddress);
+    mvwprintw(wheader, 9, 1, "  | Write count  : %d", global->cxt.wcount);
+    mvwprintw(wheader, 10, 1, "  | Write Data  : ");
 
     mvwprintw(wheader, 1, 64, "F5 | Running: %s", global->running ? "On" : "Off");
     mvwprintw(wheader, 2, 64, "F6 | Random:  %s", global->random ? "On" : "Off");
+    mvwprintw(wheader, 4, 64, "F8 | Reset statistics");
 
     int reqs      = global->stats.requests;
     int successes = global->stats.success;
@@ -160,9 +161,7 @@ init_screen(global_t *global) {
     // init header
     u8 header_bottom = 16;
     wheader          = newwin(header_bottom, COLS, 0, 0);
-    // box(wheader, 0, 0);
     redraw_header(global);
-    // refresh();
 
     // init logd
     int rows      = LINES - header_bottom;
@@ -209,17 +208,11 @@ log_adu(global_t *g, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol
 
     snprintf(buff, MAX_LINE_LEN - 1, "%s %s", left_side, payload);
     buff[MAX_LINE_LEN - 1] = '\0';
-    // int cursor              = strlen(buff) - strlen(left_side);
-    // payload_len            -= cursor;
-
-    // log_line(buff);
-    // return;
 
     int lines = strlen(buff) / COLS + 1;
     for (int i = 0; i < lines; i++) {
         u8 line_buff[MAX_LINE_LEN]  = {0};
         // TODO: clamp between COLS and MAX LINE LEN
-        // snprintf(line_buff, COLS - 1, "%s", buff[i * COLS]);
         line_buff[MAX_LINE_LEN - 1] = '\0';
         memcpy(line_buff, &buff[i * COLS], MAX_LINE_LEN - (i * COLS));
         printf("%d\n", COLS);
@@ -260,6 +253,17 @@ log_linef(const char *format, ...) {
 // =============================================================================
 // TUI
 // =============================================================================
+
+void
+close_dialog(WINDOW *win, FORM *form, FIELD **fields, int nfields) {
+    unpost_form(form);
+    free_form(form);
+    for (int i = 0; i < nfields; i++) {
+        free_field(fields[i]);
+    }
+    delwin(win);
+    redraw_log();
+}
 
 // ---------------------------- Endpoint ---------------------------------------
 
@@ -307,37 +311,15 @@ char *field_enum_parity[] = {
 };
 
 void
-tui_endpoint_legend(WINDOW *win, mb_protocol_t procol, u8 pos) {
-    if (procol == MB_PROTOCOL_TCP) {
-        mvwprintw(win, 0, 1, "TCP Endpoint");
-        mvwprintw(win, 1, 1, "%sHost:   ", pos == 0 ? "*" : " ");
-        mvwprintw(win, 2, 1, "%sPort: ", pos == 1 ? "*" : " ");
-
-        mvwprintw(win, 8, 1, "F1 - Submit");
-        mvwprintw(win, 9, 1, "F2 - Cancel");
-    } else {
-        mvwprintw(win, 0, 1, "Serial Endpoint");
-        mvwprintw(win, 1, 1, "%sDevice:   ", pos == 0 ? "*" : " ");
-        mvwprintw(win, 2, 1, "%sBaudrate: ", pos == 1 ? "*" : " ");
-        mvwprintw(win, 3, 1, "%sData bits:", pos == 2 ? "*" : " ");
-        mvwprintw(win, 4, 1, "%sStop bits:", pos == 3 ? "*" : " ");
-        mvwprintw(win, 5, 1, "%sParity:   ", pos == 4 ? "*" : " ");
-        // mvwprintw(win, 7, 1, "Status ok");
-        mvwprintw(win, 8, 1, "F1 - Submit");
-        mvwprintw(win, 9, 1, "F2 - Cancel");
-    }
-}
-
-void
 tui_endpoint(global_t *global) {
     FIELD *field[6];
-    FORM  *fendp;
+    FORM  *form;
     u8     nfields = 5; // Magic number but fine; it's maximum filed for both Serial and TCP
-    s8     pos     = 0;
+    // s8     pos     = 0;
 
     //                     h   w   y              x
-    WINDOW *wendp = newwin(11, 32, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(wendp, TRUE);
+    WINDOW *win = newwin(11, 32, LINES / 2 - 5, COLS / 2 - 16);
+    keypad(win, TRUE);
 
     if (global->cxt.protocol == MB_PROTOCOL_TCP) {
         nfields  = 2;
@@ -377,42 +359,46 @@ tui_endpoint(global_t *global) {
         field[5] = NULL;
     }
 
-    fendp = new_form(field);
-    set_form_win(fendp, wendp); //    h  w   y  x
-    set_form_sub(fendp, derwin(wendp, 5, 16, 1, 13));
-    post_form(fendp);
+    form = new_form(field);
+    set_form_win(form, win); //    h  w   y  x
+    set_form_sub(form, derwin(win, 5, 16, 1, 13));
+    post_form(form);
 
     // TODO: TMP
-    box(wendp, 0, 0);
-    tui_endpoint_legend(wendp, global->cxt.protocol, 0);
-    wrefresh(wendp);
+    box(win, 0, 0);
+    if (global->cxt.protocol == MB_PROTOCOL_TCP) {
+        mvwprintw(win, 0, 1, "TCP Endpoint");
+        mvwprintw(win, 1, 1, "Host:   ");
+        mvwprintw(win, 2, 1, "Port:   ");
+
+        mvwprintw(win, 8, 1, "F1 - Submit");
+        mvwprintw(win, 9, 1, "F2 - Cancel");
+    } else {
+        mvwprintw(win, 0, 1, "Serial Endpoint");
+        mvwprintw(win, 1, 1, "Device:   ");
+        mvwprintw(win, 2, 1, "Baudrate: ");
+        mvwprintw(win, 3, 1, "Data bits:");
+        mvwprintw(win, 4, 1, "Stop bits:");
+        mvwprintw(win, 5, 1, "Parity:   ");
+
+        mvwprintw(win, 8, 1, "F1 - Submit");
+        mvwprintw(win, 9, 1, "F2 - Cancel");
+    }
+    wrefresh(win);
+    pos_form_cursor(form);
 
     while (1) {
-        int ch = wgetch(wendp);
+        int ch = wgetch(win);
 
         switch (ch) {
-        case KEY_DOWN:
-            pos = (pos + 1) % nfields;
-            form_driver(fendp, REQ_NEXT_FIELD);
-            tui_endpoint_legend(wendp, global->cxt.protocol, pos);
-            break;
-
-        case KEY_UP:
-            pos--;
-            if (pos < 0) {
-                pos = nfields - 1;
-            }
-            form_driver(fendp, REQ_PREV_FIELD);
-            tui_endpoint_legend(wendp, global->cxt.protocol, pos);
-            break;
-
-        case KEY_LEFT : form_driver(fendp, REQ_PREV_CHOICE); break;
-        case KEY_RIGHT: form_driver(fendp, REQ_NEXT_CHOICE); break;
-
-        case KEY_BACKSPACE: form_driver(fendp, REQ_DEL_PREV); break;
+        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
+        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
+        case KEY_LEFT     : form_driver(form, REQ_PREV_CHOICE); break;
+        case KEY_RIGHT    : form_driver(form, REQ_NEXT_CHOICE); break;
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
 
         // cancel
-        case KEY_F(2): goto close_endpoint_tui;
+        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // try submit
         case KEY_F(1):
@@ -422,7 +408,8 @@ tui_endpoint(global_t *global) {
                     memcpy(&global->tcp_endp, &tcp, sizeof(tcp));
 
                     relink(global);
-                    goto close_endpoint_tui;
+                    close_dialog(win, form, field, nfields);
+                    return;
                 }
             } else {
                 serial_cfg new_conf = {0};
@@ -435,49 +422,29 @@ tui_endpoint(global_t *global) {
                     memcpy(&global->sconf, &new_conf, sizeof(new_conf));
 
                     relink(global);
-                    goto close_endpoint_tui;
+                    close_dialog(win, form, field, nfields);
+                    return;
                 }
                 // serial config is bad, just continue with this window
                 break;
             }
 
-        default: form_driver(fendp, ch); break;
+        default: form_driver(form, ch); break;
         }
     }
-
-close_endpoint_tui:
-    unpost_form(fendp);
-    free_form(fendp);
-    for (int i = 0; i < nfields; i++) {
-        free_field(field[i]);
-    }
-    delwin(wendp);
-    redraw_log();
-    // we're done
 }
 
 // ---------------------------- UID --------------------------------------------
 
 void
-tui_uid_legend(WINDOW *win, u8 pos) {
-    mvwprintw(win, 0, 1, "Unit ID");
-    mvwprintw(win, 1, 1, "%sUID Start: ", pos == 0 ? "*" : " ");
-    mvwprintw(win, 2, 1, "%sUID End:   ", pos == 1 ? "*" : " ");
-    // mvwprintw(win, 7, 1, "Status ok");
-    mvwprintw(win, 4, 1, "F1 - Submit");
-    mvwprintw(win, 5, 1, "F2 - Cancel");
-}
-
-void
 tui_uid(global_t *global) {
-    FIELD *field[6];
-    FORM  *fuid;
+    FIELD *field[3];
+    FORM  *form;
     u8     nfields = 3; // Magic number but fine; it's maximum filed for both Serial and TCP
-    s8     pos     = 0;
 
     //                     h   w   y              x
-    WINDOW *wuid = newwin(7, 32, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(wuid, TRUE);
+    WINDOW *win = newwin(7, 32, LINES / 2 - 5, COLS / 2 - 16);
+    keypad(win, TRUE);
 
     // end field
     field[0] = new_field(1, 14, 0, 0, 0, 0);
@@ -496,38 +463,31 @@ tui_uid(global_t *global) {
 
     field[2] = NULL;
 
-    fuid = new_form(field);
-    set_form_win(fuid, wuid); //    h  w   y  x
-    set_form_sub(fuid, derwin(wuid, 5, 16, 1, 13));
-    post_form(fuid);
+    form = new_form(field);
+    set_form_win(form, win); //    h  w   y  x
+    set_form_sub(form, derwin(win, 5, 16, 1, 13));
+    post_form(form);
 
-    box(wuid, 0, 0);
-    tui_uid_legend(wuid, 0);
-    wrefresh(wuid);
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Unit ID");
+    mvwprintw(win, 1, 1, "UID Start: ");
+    mvwprintw(win, 2, 1, "UID End:   ");
+    // mvwprintw(win, 7, 1, "Status ok");
+    mvwprintw(win, 4, 1, "F1 - Submit");
+    mvwprintw(win, 5, 1, "F2 - Cancel");
+    wrefresh(win);
+    pos_form_cursor(form);
 
     while (1) {
-        int ch = wgetch(wuid);
+        int ch = wgetch(win);
 
         switch (ch) {
-        case KEY_DOWN:
-            pos = (pos + 1) % (nfields - 1);
-            form_driver(fuid, REQ_NEXT_FIELD);
-            tui_uid_legend(wuid, pos);
-            break;
-
-        case KEY_UP:
-            pos--;
-            if (pos < 0) {
-                pos = nfields - 2;
-            }
-            form_driver(fuid, REQ_PREV_FIELD);
-            tui_uid_legend(wuid, pos);
-            break;
-
-        case KEY_BACKSPACE: form_driver(fuid, REQ_DEL_PREV); break;
+        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
+        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
 
         // cancel
-        case KEY_F(2): goto close_uid_tui;
+        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // sumbit
         case KEY_F(1): {
@@ -536,24 +496,15 @@ tui_uid(global_t *global) {
             if (uid_from_str(&start, &end, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
                 global->slave_id_start = start;
                 global->slave_id_end   = end;
-                goto close_uid_tui;
+                close_dialog(win, form, field, nfields);
+                return;
             }
             break;
         }
 
-        default: form_driver(fuid, ch); break;
+        default: form_driver(form, ch); break;
         }
     }
-
-close_uid_tui:
-    unpost_form(fuid);
-    free_form(fuid);
-    for (int i = 0; i < nfields; i++) {
-        free_field(field[i]);
-    }
-    delwin(wuid);
-    redraw_log();
-    // we're done
 }
 
 // ---------------------------- Function codes ---------------------------------
@@ -617,10 +568,104 @@ tui_fc(global_t *global) {
     redraw_log();
 }
 
+// ---------------------------- Qantities and addresses ------------------------
+
 void
-handle_user_input() {
-    // ?
+tui_qty_addr(global_t *global) {
+    FIELD *field[5];
+    FORM  *form;
+    u8     nfields = 4; // Magic number but fine; it's maximum filed for both Serial and TCP
+
+    //                   h   w   y              x
+    WINDOW *win = newwin(9, 26, LINES / 2 - 5, COLS / 2 - 16);
+    keypad(win, TRUE);
+
+    for (int i = 0; i < nfields; i++) {
+        field[i] = new_field(1, 6, i, 0, 0, 0);
+        set_field_back(field[i], A_UNDERLINE);
+    }
+
+    // read address field
+    set_field_type(field[0], TYPE_INTEGER, 0, 0, 0xFFFF);
+    char buff[16] = {0};
+    snprintf(buff, 16, "%d", global->cxt.raddress);
+    set_field_buffer(field[0], 0, buff);
+
+    // read count field
+    set_field_type(field[1], TYPE_INTEGER, 0, 0, 2000);
+    memset(buff, 0, 16);
+    snprintf(buff, 16, "%d", global->cxt.rcount);
+    set_field_buffer(field[1], 0, buff);
+
+    // write address field
+    set_field_type(field[2], TYPE_INTEGER, 0, 0, 0xFFFF);
+    memset(buff, 0, 16);
+    snprintf(buff, 16, "%d", global->cxt.waddress);
+    set_field_buffer(field[2], 0, buff);
+
+    // write count field
+    set_field_type(field[3], TYPE_INTEGER, 0, 0, 0x07B0);
+    memset(buff, 0, 16);
+    snprintf(buff, 16, "%d", global->cxt.wcount);
+    set_field_buffer(field[3], 0, buff);
+
+    field[4] = NULL;
+
+    form = new_form(field);
+    set_form_win(form, win); //    h  w   y  x
+    set_form_sub(form, derwin(win, 5, 6, 1, 18));
+    post_form(form);
+
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Qanity and Addresses");
+    mvwprintw(win, 1, 1, "Read  address: ");
+    mvwprintw(win, 2, 1, "Read  count:   ");
+    mvwprintw(win, 3, 1, "Write address: ");
+    mvwprintw(win, 4, 1, "Write count:   ");
+    mvwprintw(win, 6, 1, "F1 - Submit");
+    mvwprintw(win, 7, 1, "F2 - Cancel");
+    wrefresh(win);
+    pos_form_cursor(form);
+
+    while (1) {
+        int ch = wgetch(win);
+
+        switch (ch) {
+        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
+        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+
+        // cancel
+        case KEY_F(2): close_dialog(win, form, field, nfields); return;
+
+        // sumbit
+        case KEY_F(1): {
+            char *fb1 = field_buffer(field[0], 0);
+            char *fb2 = field_buffer(field[1], 0);
+            char *fb3 = field_buffer(field[2], 0);
+            char *fb4 = field_buffer(field[3], 0);
+
+            int raddr  = 0;
+            int rcount = 0;
+            int waddr  = 0;
+            int wcount = 0;
+            if (qnt_addr_from_str(&raddr, &rcount, &waddr, &wcount, fb1, fb2, fb3, fb4)) {
+                global->cxt.raddress = raddr;
+                global->cxt.rcount   = rcount;
+                global->cxt.waddress = waddr;
+                global->cxt.wcount   = wcount;
+                close_dialog(win, form, field, nfields);
+                return;
+            }
+            break;
+        }
+
+        default: form_driver(form, ch); break;
+        }
+    }
 }
+
+// ---------------------------- Parent function --------------------------------
 
 void *
 input_thread(void *global) {
@@ -642,10 +687,17 @@ input_thread(void *global) {
         case KEY_2: tui_endpoint(g); break;
         case KEY_3: tui_uid(g); break;
         case KEY_4: tui_fc(g); break;
+        case KEY_5: tui_qty_addr(g); break;
 
         case KEY_F(5): g->running = ~g->running; break;
-
         case KEY_F(6): g->random = ~g->random; break;
+        case KEY_F(8):
+            g->stats.requests = 0;
+            g->stats.success  = 0;
+            g->stats.timeouts = 0;
+            g->stats.fails    = 0;
+            redraw_header(g);
+            break;
         }
 
         redraw_header(g);

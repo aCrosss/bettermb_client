@@ -65,8 +65,7 @@ read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u64 tstart) {
         expected = mb_get_expected_adu_len(globals.cxt.protocol, out, pos, MB_DIR_RESPONSE);
         if (expected < 0) {
             return RC_FAIL;
-        }
-        if (expected == 0) {
+        } else if (expected == 0) {
             expected = MB_MAX_ADU_LEN;
         }
 
