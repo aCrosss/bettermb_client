@@ -18,9 +18,13 @@ int
 sconf_from_str(serial_cfg *sconf, char *device, char *baud, char *dbits, char *sbits, const char *parity);
 int
 qnt_addr_from_str(int *ra, int *rc, int *wa, int *wc, char *sra, char *src, char *swa, char *swc);
+int
+timeouts_from_str(int *rtout, int *stout, char *s_rtout, char *s_stout);
 void
 str_curr_endpoint(char out[32], global_t *global);
 u64
 now_ms(void);
+void
+msleep(int ms);
 
 #endif

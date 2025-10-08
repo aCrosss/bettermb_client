@@ -45,7 +45,6 @@ send_request(frame_t *frame) {
 
     globals.stats.requests++;
     int bytes_send = write(globals.cxt.fd, adu, adu_len);
-    // int bytes_send = send(globals.cxt.fd, adu, adu_len, 0);
     if (bytes_send > 0) {
         log_adu(&globals, adu, adu_len, frame->protocol, DS_OUT_OK);
         return RC_SUCCESS;
@@ -104,6 +103,7 @@ recv_response(frame_t *req_frame) {
         mb_extract_frame(req_frame->protocol, adu, adu_len, &rsp_frame);
 
         // can be response that we already count as 'timed out, skip it
+        // NN after add of pre send cleanup?
         if (req_frame->tid != rsp_frame.tid) {
             log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
             log_linef("get %d tid, expected %d", rsp_frame.tid, req_frame->tid);
@@ -154,7 +154,7 @@ main(int argc, char *argv[]) {
     }
 
     init_screen(&globals);
-    log_line("> screen initialized...");
+    log_line("> tui started");
 
     open_uplink(&globals);
 
@@ -166,9 +166,7 @@ main(int argc, char *argv[]) {
             make_request();
         }
 
-        // msleep(globals.timeout);
-        // getchar();
-        sleep(1);
+        msleep(globals.timeout);
     }
 
     // pthread_exit(NULL);

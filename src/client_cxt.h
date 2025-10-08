@@ -57,7 +57,5 @@ typedef struct global {
 
 int
 init_client(int argc, char **argv, global_t *global);
-void
-msleep(int ms);
 
 #endif

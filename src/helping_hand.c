@@ -213,8 +213,32 @@ qnt_addr_from_str(int *ra, int *rc, int *wa, int *wc, char *sra, char *src, char
     }
     // Note: upper and above 0 boundaries should be handled by tui, make other checks
     // is pointless and better to lay it on pdu and adu building functions and endpoint's
-    // request validation. worse case scenarion should be: user fails with request
+    // request validation. worst case scenarion should be: user fails with request
     // building or response and change this settings
+
+    return RC_SUCCESS;
+}
+
+int
+timeouts_from_str(int *rtout, int *stout, char *s_rtout, char *s_stout) {
+    trim_spaces(s_rtout);
+    trim_spaces(s_stout);
+
+    if (parse_int(s_rtout, rtout) < 0) {
+        log_linef("! invalid response tiomeout: %d", *rtout);
+        return RC_FAIL;
+    } else if (*rtout < 0 || *rtout > 10000) {
+        log_linef("! uid start must be between 0 and 10 000 ms: %d", *rtout);
+        return RC_FAIL;
+    }
+
+    if (parse_int(s_stout, stout) < 0) {
+        log_linef("! invalid send timeout: %d", *stout);
+        return RC_FAIL;
+    } else if (*stout < 0 || *stout > 10000) {
+        log_linef("! uid end must be between 0 and 10 000 ms: %d", *stout);
+        return RC_FAIL;
+    }
 
     return RC_SUCCESS;
 }
@@ -256,4 +280,12 @@ now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (u64)ts.tv_sec * 1000ull + (u64)ts.tv_nsec / 1000000ull;
+}
+
+void
+msleep(int ms) {
+    struct timespec ts;
+    ts.tv_sec  = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000;
+    nanosleep(&ts, NULL);
 }

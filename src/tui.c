@@ -16,23 +16,24 @@ global_t *pglobals;
 const char *
 str_baud(int baudrare) {
     switch (baudrare) {
-    case 0    : return "0";
-    case 50   : return "50";
-    case 75   : return "75";
-    case 110  : return "110";
-    case 134  : return "134";
-    case 150  : return "150";
-    case 200  : return "200";
-    case 300  : return "300";
-    case 600  : return "600";
-    case 1200 : return "1200";
-    case 1800 : return "1800";
-    case 2400 : return "2400";
-    case 4800 : return "4800";
-    case 9600 : return "9600";
-    case 19200: return "19200";
-    case 38400: return "38400";
-    default   : return "19200";
+    case 0     : return "0";
+    case 50    : return "50";
+    case 75    : return "75";
+    case 110   : return "110";
+    case 134   : return "134";
+    case 150   : return "150";
+    case 200   : return "200";
+    case 300   : return "300";
+    case 600   : return "600";
+    case 1200  : return "1200";
+    case 1800  : return "1800";
+    case 2400  : return "2400";
+    case 4800  : return "4800";
+    case 9600  : return "9600";
+    case 19200 : return "19200";
+    case 38400 : return "38400";
+    case 115200: return "115200";
+    default    : return "19200";
     }
 
     return "19200";
@@ -107,7 +108,7 @@ redraw_header(global_t *global) {
         mvwprintw(wheader, 3, 1, "3 | Unit IDs: %d-%d", global->slave_id_start, global->slave_id_end);
     }
     mvwprintw(wheader, 4, 1, "4 | Function: %s", str_fc(global->cxt.fc));
-    //
+
     mvwprintw(wheader, 6, 1, "5 | Read address : 0x%04X", global->cxt.raddress);
     mvwprintw(wheader, 7, 1, "  | Read count   : %d", global->cxt.rcount);
     mvwprintw(wheader, 8, 1, "  | Write address: 0x%04X", global->cxt.waddress);
@@ -117,6 +118,9 @@ redraw_header(global_t *global) {
     mvwprintw(wheader, 1, 64, "F5 | Running: %s", global->running ? "On" : "Off");
     mvwprintw(wheader, 2, 64, "F6 | Random:  %s", global->random ? "On" : "Off");
     mvwprintw(wheader, 4, 64, "F8 | Reset statistics");
+
+    mvwprintw(wheader, 6, 64, "F9 | Response timeout: %d ms", global->response_timeout);
+    mvwprintw(wheader, 7, 64, "   | Send timeout    : %d ms", global->timeout);
 
     int reqs      = global->stats.requests;
     int successes = global->stats.success;
@@ -665,6 +669,79 @@ tui_qty_addr(global_t *global) {
     }
 }
 
+// ---------------------------- Timeouts ---------------------------------------
+
+void
+tui_timeouts(global_t *global) {
+    FIELD *field[3];
+    FORM  *form;
+    u8     nfields = 3; // Magic number but fine; it's maximum filed for both Serial and TCP
+
+    //                   h   w   y              x
+    WINDOW *win = newwin(7, 27, LINES / 2 - 5, COLS / 2 - 16);
+    keypad(win, TRUE);
+
+    // response timeout field
+    field[0] = new_field(1, 6, 0, 0, 0, 0);
+    set_field_back(field[0], A_UNDERLINE);
+    set_field_type(field[0], TYPE_INTEGER, 0, 0, 10000);
+    char buff[16] = {0};
+    snprintf(buff, 16, "%d", global->response_timeout);
+    set_field_buffer(field[0], 0, buff);
+    // send timeout field
+    field[1] = new_field(1, 6, 1, 0, 0, 0);
+    set_field_back(field[1], A_UNDERLINE);
+    set_field_type(field[1], TYPE_INTEGER, 0, 0, 10000);
+    memset(buff, 0, 16);
+    snprintf(buff, 16, "%d", global->timeout);
+    set_field_buffer(field[1], 0, buff);
+
+    field[2] = NULL;
+
+    form = new_form(field);
+    set_form_win(form, win); //    h  w   y  x
+    set_form_sub(form, derwin(win, 5, 6, 1, 19));
+    post_form(form);
+
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Timeouts");
+    mvwprintw(win, 1, 1, "Response timeout: ");
+    mvwprintw(win, 2, 1, "Send timeout:     ");
+
+    mvwprintw(win, 4, 1, "F1 - Submit");
+    mvwprintw(win, 5, 1, "F2 - Cancel");
+    wrefresh(win);
+    pos_form_cursor(form);
+
+    while (1) {
+        int ch = wgetch(win);
+
+        switch (ch) {
+        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
+        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+
+        // cancel
+        case KEY_F(2): close_dialog(win, form, field, nfields); return;
+
+        // sumbit
+        case KEY_F(1): {
+            int rtimeout = 0;
+            int stimeout = 0;
+            if (timeouts_from_str(&rtimeout, &stimeout, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
+                global->response_timeout = rtimeout;
+                global->timeout          = stimeout;
+                close_dialog(win, form, field, nfields);
+                return;
+            }
+            break;
+        }
+
+        default: form_driver(form, ch); break;
+        }
+    }
+}
+
 // ---------------------------- Parent function --------------------------------
 
 void *
@@ -698,6 +775,8 @@ input_thread(void *global) {
             g->stats.fails    = 0;
             redraw_header(g);
             break;
+
+        case KEY_F(9): tui_timeouts(g); break;
         }
 
         redraw_header(g);
