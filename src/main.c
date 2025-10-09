@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "client_cxt.h"
@@ -76,6 +77,7 @@ send_request(frame_t *frame) {
             build_wdata_regs(&fcxt, wdata);
         }
     }
+    frame->expected_rsp_adu_len = client_get_expected_rsp_adu_len(frame->protocol, &fcxt);
 
     int pdu_len = build_pdu(frame->pdu, wdata, fcxt);
     if (pdu_len > 0) {
@@ -93,12 +95,12 @@ send_request(frame_t *frame) {
         return RC_FAIL;
     }
 
-    // clear all pesky leftovers
-    u8 garbage[MB_MAX_ADU_LEN];
-    read(globals.cxt.fd, &garbage, MB_MAX_ADU_LEN);
-
     globals.stats.requests++;
     int bytes_send = write(globals.cxt.fd, adu, adu_len);
+
+    // clear all pesky leftovers
+    tcflush(globals.cxt.fd, TCIFLUSH);
+
     if (bytes_send > 0) {
         log_adu(&globals, adu, adu_len, frame->protocol, DS_OUT_OK);
         return RC_SUCCESS;
@@ -110,24 +112,22 @@ send_request(frame_t *frame) {
 }
 
 int
-read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u64 tstart) {
-    u32 pos      = 0;
-    u32 expected = 0;
+read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u16 expected) {
+    u32 pos                  = 0;
+    u8  buff[MB_MAX_ADU_LEN] = {0};
+    int temp_len             = 0;
 
     while (1) {
-        expected = mb_get_expected_adu_len(globals.cxt.protocol, out, pos, MB_DIR_RESPONSE);
         if (expected < 0) {
             return RC_FAIL;
-        } else if (expected == 0) {
-            expected = MB_MAX_ADU_LEN;
         }
 
-        int add = read(globals.cxt.fd, &out[pos], expected);
+        int add = read(globals.cxt.fd, &out[pos], expected - pos);
         if (add > 0) {
             pos += add;
         }
 
-        if (now_ms() - tstart > globals.response_timeout) {
+        if (now_ms() - globals.time_start > globals.response_timeout) {
             log_traffic_str(&globals, "timed out", DS_IN_FAIL);
             globals.stats.timeouts++;
             return RC_FAIL;
@@ -135,6 +135,7 @@ read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u64 tstart) {
 
         if (pos >= expected) {
             *out_len = pos;
+
             return RC_SUCCESS;
         }
     }
@@ -142,13 +143,10 @@ read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u64 tstart) {
 
 int
 recv_response(frame_t *req_frame) {
-    // (almost) immediately after message sent, can count time for response arrival
-    u64 start = now_ms();
-
     u8  adu[MB_MAX_ADU_LEN] = {0};
     int adu_len             = 0;
 
-    if (!read_nonblock(adu, &adu_len, start)) {
+    if (!read_nonblock(adu, &adu_len, req_frame->expected_rsp_adu_len)) {
         return RC_FAIL;
     }
 
@@ -157,11 +155,8 @@ recv_response(frame_t *req_frame) {
         mb_extract_frame(req_frame->protocol, adu, adu_len, &rsp_frame);
 
         // can be response that we already count as 'timed out, skip it
-        // NN after add of pre send cleanup?
         if (req_frame->tid != rsp_frame.tid) {
-            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
-            log_linef("get %d tid, expected %d", rsp_frame.tid, req_frame->tid);
-            return RC_FAIL;
+            return recv_response(req_frame);
         }
 
         if (check_req_rsp_pdu(req_frame->pdu, req_frame->pdu_len, rsp_frame.pdu, rsp_frame.pdu_len)) {
@@ -169,7 +164,6 @@ recv_response(frame_t *req_frame) {
             globals.stats.success++;
             return RC_SUCCESS;
         } else {
-            // 192.168.5.225:502 <x failed to send requesto
             log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
             globals.stats.fails++;
             log_line("! recieved response is invalid");
@@ -195,6 +189,7 @@ make_request() {
         return RC_FAIL;
     }
 
+    globals.time_start = now_ms();
     recv_response(&frame);
 
     // update statistic output

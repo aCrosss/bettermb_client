@@ -57,6 +57,8 @@ typedef struct global {
     u8  running;
     int timeout; // ms
     int random;
+
+    u64 time_start;
 } global_t;
 
 int

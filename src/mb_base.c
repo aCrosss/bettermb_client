@@ -606,6 +606,52 @@ mb_get_expected_adu_len(mb_protocol_t proto, u8 *adu, int adu_len, mb_dir_t dir)
     return -1;
 }
 
+int
+client_get_expected_rsp_adu_len(mb_protocol_t protocol, func_cxt_t *fcxt) {
+    // bytes len for various parts
+    const int mbaph      = 7;
+    const int uid        = 1;
+    const int crc        = 2;
+    const int ascii_head = 1;
+    const int ascii_tail = 2;
+    const int pdu_head   = 2; // fc + byte count
+
+    int pdu_len    = 0;
+    int byte_count = 0;
+    switch (fcxt->fc) {
+    case MB_FC_READ_COILS:
+    case MB_FC_READ_DISCRETE_INPUTS:
+        byte_count = fcxt->rcount / 8 + 1;
+        pdu_len    = pdu_head + byte_count;
+        break;
+
+    case MB_FC_READ_HOLDING_REGISTERS:
+    case MB_FC_READ_INPUT_REGISTERS:
+        byte_count = fcxt->rcount * 2;
+        pdu_len    = pdu_head + byte_count;
+        break;
+
+    case MB_FC_WRITE_SINGLE_COIL:
+    case MB_FC_WRITE_SINGLE_REGISTER:
+    case MB_FC_WRITE_MULTIPLE_COILS:
+    case MB_FC_WRITE_MULTIPLE_REGISTERS:
+        byte_count = 2; // always 2 bytes for response
+        pdu_len    = pdu_head + byte_count;
+        break;
+
+    case MB_FC_WRITE_AND_READ_REGISTERS:
+        byte_count = fcxt->rcount * 2;
+        pdu_len    = pdu_head + byte_count;
+        break;
+    }
+
+    switch (protocol) {
+    case MB_PROTOCOL_RTU  : return uid + pdu_len + crc;
+    case MB_PROTOCOL_ASCII: return ascii_head + pdu_len * 2 + crc + ascii_tail;
+    case MB_PROTOCOL_TCP  : return mbaph + pdu_len;
+    }
+}
+
 // =============================================================================
 // Extract frame from ADU
 // =============================================================================

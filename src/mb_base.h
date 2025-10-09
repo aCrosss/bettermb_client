@@ -34,6 +34,7 @@ typedef struct frame {
     u8  uid;
     u16 tid;
     u8  pdu_len;
+    u16 expected_rsp_adu_len;
 
     u8 pdu[MB_MAX_PDU_LEN];
 } frame_t;
@@ -46,6 +47,8 @@ int
 build_adu(u8 *adu, frame_t *frame);
 int
 mb_get_expected_adu_len(mb_protocol_t proto, u8 *adu, int adu_len, mb_dir_t dir);
+int
+client_get_expected_rsp_adu_len(mb_protocol_t protocol, func_cxt_t *fcxt);
 void
 mb_extract_frame(mb_protocol_t proto, u8 *adu, int adu_len, frame_t *out);
 mb_validation_err_t
