@@ -243,6 +243,33 @@ timeouts_from_str(int *rtout, int *stout, char *s_rtout, char *s_stout) {
     return RC_SUCCESS;
 }
 
+int
+wdata_from_str(global_t *global, char *str) {
+    trim_spaces(str);
+
+    memset(global->cxt.wdata, 0, sizeof(global->cxt.wdata));
+
+    u16   temp_data[WD_MAX_LEN] = {0};
+    int   ind                   = 0;
+    char *endpt;
+
+    char *pch = strtok(str, " ");
+    while (pch != NULL && ind < WD_MAX_LEN) {
+        int tmp = strtol(pch, &endpt, 16);
+
+        temp_data[ind] = tmp;
+
+        ind++;
+        pch = strtok(NULL, " ");
+    }
+
+    for (int i = 0; i < ind; i++) {
+        global->cxt.wdata[i] = temp_data[i];
+    }
+
+    return RC_SUCCESS;
+}
+
 void
 str_curr_endpoint(char out[32], global_t *global) {
     memset(out, 0, 32);
@@ -288,4 +315,22 @@ msleep(int ms) {
     ts.tv_sec  = ms / 1000;
     ts.tv_nsec = (ms % 1000) * 1000000;
     nanosleep(&ts, NULL);
+}
+
+// WRITE, READ, BITS
+int
+fc_flags(int function_code) {
+    switch (function_code) {
+    case MB_FC_READ_COILS:
+    case MB_FC_READ_DISCRETE_INPUTS    : return FCF_READ | FCF_BITS;
+    case MB_FC_READ_HOLDING_REGISTERS  :
+    case MB_FC_READ_INPUT_REGISTERS    : return FCF_READ;
+    case MB_FC_WRITE_SINGLE_COIL       : return FCF_WRITE | FCF_BITS;
+    case MB_FC_WRITE_SINGLE_REGISTER   : return FCF_WRITE;
+    case MB_FC_WRITE_MULTIPLE_COILS    : return FCF_WRITE | FCF_BITS;
+    case MB_FC_WRITE_MULTIPLE_REGISTERS: return FCF_WRITE;
+    case MB_FC_WRITE_AND_READ_REGISTERS: return FCF_WRITE | FCF_READ;
+    }
+
+    return -1;
 }

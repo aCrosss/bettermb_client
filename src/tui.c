@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -93,6 +94,41 @@ str_dirstat(dirstat_t ds) {
 }
 
 void
+print_wdata(global_t *global) {
+    int fflags = fc_flags(global->cxt.fc);
+    if (!(fflags & FCF_WRITE)) {
+        return;
+    }
+
+    const u8 startx          = 20; // based on "6 | Write Data   : " len + 1
+    const u8 starty          = 10;
+    const u8 is_bits         = fflags & FCF_BITS;
+    const u8 notaion_len     = is_bits ? 1 : 4;   // reg of coil
+    const u8 available_space = COLS - startx - 1; // header + right border line
+    const u8 write_count     = CLAMP(global->cxt.wcount, 0, WD_MAX_LEN);
+    const u8 elem_per_line   = available_space / (notaion_len + 1); // + space
+    const u8 nlines          = write_count / elem_per_line + 1;
+
+    int not_finished = write_count;
+    for (int y = 0; y < nlines; y++) {
+        int   buff_len             = available_space * nlines + 1;
+        char *buff                 = calloc(buff_len, sizeof(u8));
+        int   elem_to_current_line = CLAMP(not_finished, 0, elem_per_line);
+        for (int i = 0; i < elem_to_current_line; i++) {
+            if (is_bits) {
+                sprintf(&buff[i * (notaion_len + 1)], "%d ", global->cxt.wdata[i] > 0);
+            } else {
+                sprintf(&buff[i * (notaion_len + 1)], "%04X ", global->cxt.wdata[i]);
+            }
+        }
+        buff[buff_len - 1] = '\0';
+        mvwprintw(wheader, starty + y, startx, "%s", buff);
+        free(buff);
+        not_finished -= elem_per_line;
+    }
+}
+
+void
 redraw_header(global_t *global) {
     wclear(wheader);
     box(wheader, 0, 0);
@@ -113,7 +149,8 @@ redraw_header(global_t *global) {
     mvwprintw(wheader, 7, 1, "  | Read count   : %d", global->cxt.rcount);
     mvwprintw(wheader, 8, 1, "  | Write address: 0x%04X", global->cxt.waddress);
     mvwprintw(wheader, 9, 1, "  | Write count  : %d", global->cxt.wcount);
-    mvwprintw(wheader, 10, 1, "  | Write Data  : ");
+    mvwprintw(wheader, 10, 1, "6 | Write Data   : ");
+    print_wdata(global);
 
     mvwprintw(wheader, 1, 64, "F5 | Running: %s", global->running ? "On" : "Off");
     mvwprintw(wheader, 2, 64, "F6 | Random:  %s", global->random ? "On" : "Off");
@@ -406,6 +443,11 @@ tui_endpoint(global_t *global) {
 
         // try submit
         case KEY_F(1):
+            // make sure all buffer available and valid
+            if (form_driver(form, REQ_VALIDATION) != E_OK) {
+                break;
+            }
+
             if (global->cxt.protocol == MB_PROTOCOL_TCP) {
                 tcp_endp tcp = {0};
                 if (tcp_ednp_from_str(&tcp, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
@@ -495,6 +537,11 @@ tui_uid(global_t *global) {
 
         // sumbit
         case KEY_F(1): {
+            // make sure all buffer available and valid
+            if (form_driver(form, REQ_VALIDATION) != E_OK) {
+                break;
+            }
+
             int start = 0;
             int end   = 0;
             if (uid_from_str(&start, &end, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
@@ -644,6 +691,11 @@ tui_qty_addr(global_t *global) {
 
         // sumbit
         case KEY_F(1): {
+            // make sure all buffer available and valid
+            if (form_driver(form, REQ_VALIDATION) != E_OK) {
+                break;
+            }
+
             char *fb1 = field_buffer(field[0], 0);
             char *fb2 = field_buffer(field[1], 0);
             char *fb3 = field_buffer(field[2], 0);
@@ -726,11 +778,96 @@ tui_timeouts(global_t *global) {
 
         // sumbit
         case KEY_F(1): {
+            // make sure all buffer available and valid
+            if (form_driver(form, REQ_VALIDATION) != E_OK) {
+                break;
+            }
+
             int rtimeout = 0;
             int stimeout = 0;
             if (timeouts_from_str(&rtimeout, &stimeout, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
                 global->response_timeout = rtimeout;
                 global->timeout          = stimeout;
+                close_dialog(win, form, field, nfields);
+                return;
+            }
+            break;
+        }
+
+        default: form_driver(form, ch); break;
+        }
+    }
+}
+
+// ---------------------------- Write data--------------------------------------
+
+void
+tui_wdata(global_t *global) {
+    FIELD *field[2];
+    FORM  *form;
+    u8     nfields = 1; // Magic number but fine; it's maximum filed for both Serial and TCP
+
+    const u8 input_line_len = 40;
+    const u8 reg_str_len    = 4; // 4 bytes for register presentation; choosed as bigger of coils/regs
+
+    // 4 chars for one reg + space for all of them exept last one on the line
+    const u8 regs_on_line = input_line_len / (reg_str_len + 1);
+    const u8 nlines       = WD_MAX_LEN / regs_on_line + !!(WD_MAX_LEN % regs_on_line);
+
+    // len of "Data: " + len of input line + 2 border lines
+    const u8 win_width  = 8 + input_line_len + 2;
+    // rows for nlines, division line, submit, cancel AND two border lines
+    const u8 win_height = nlines + 3 + 2;
+
+    const u8 current_reg_count = CLAMP(global->cxt.wcount, 0, WD_MAX_LEN);
+
+    //                   h           w          y                           x
+    WINDOW *win = newwin(win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2);
+    keypad(win, TRUE);
+
+    // response timeout field
+    field[0] = new_field(nlines, input_line_len, 0, 0, 0, 0);
+    set_field_back(field[0], A_UNDERLINE);
+
+    // write data to buffer
+    int   buff_len = input_line_len * nlines + 1;
+    char *buff     = calloc(buff_len, sizeof(u8));
+    for (u8 i = 0; i < current_reg_count; i++) {
+        sprintf(&buff[i * 5], "%04X ", global->cxt.wdata[i]);
+    }
+    buff[buff_len - 1] = '\0';
+    set_field_buffer(field[0], 0, buff);
+    free(buff);
+
+    field[1] = NULL;
+
+    form = new_form(field);
+    set_form_win(form, win); //    h       w               y  x
+    set_form_sub(form, derwin(win, nlines, input_line_len, 1, 8));
+    post_form(form);
+
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Write data");
+    mvwprintw(win, 1, 1, "Data: ");
+
+    mvwprintw(win, nlines + 2, 1, "F1 - Submit");
+    mvwprintw(win, nlines + 3, 1, "F2 - Cancel");
+    wrefresh(win);
+    pos_form_cursor(form);
+
+    while (1) {
+        int ch = wgetch(win);
+
+        switch (ch) {
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+
+        // cancel
+        case KEY_F(2): close_dialog(win, form, field, nfields); return;
+
+        // sumbit
+        case KEY_F(1): {
+            if (form_driver(form, REQ_VALIDATION) == E_OK) {
+                wdata_from_str(global, field_buffer(field[0], 0));
                 close_dialog(win, form, field, nfields);
                 return;
             }
@@ -765,6 +902,7 @@ input_thread(void *global) {
         case KEY_3: tui_uid(g); break;
         case KEY_4: tui_fc(g); break;
         case KEY_5: tui_qty_addr(g); break;
+        case KEY_6: tui_wdata(g); break;
 
         case KEY_F(5): g->running = ~g->running; break;
         case KEY_F(6): g->random = ~g->random; break;

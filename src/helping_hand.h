@@ -20,11 +20,15 @@ int
 qnt_addr_from_str(int *ra, int *rc, int *wa, int *wc, char *sra, char *src, char *swa, char *swc);
 int
 timeouts_from_str(int *rtout, int *stout, char *s_rtout, char *s_stout);
+int
+wdata_from_str(global_t *global, char *str);
 void
 str_curr_endpoint(char out[32], global_t *global);
 u64
 now_ms(void);
 void
 msleep(int ms);
+int
+fc_flags(int function_code);
 
 #endif

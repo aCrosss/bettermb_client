@@ -21,10 +21,10 @@ typedef enum {
 
 typedef struct func_cxt {
     fc_t fc;
-    u8   waddress;
-    u8   wcount;
-    u8   raddress;
-    u8   rcount;
+    int  waddress;
+    int  wcount;
+    int  raddress;
+    int  rcount;
 } func_cxt_t;
 
 typedef struct frame {

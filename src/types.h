@@ -21,6 +21,10 @@
 #define HI_NIBBLE(fbyte) ((fbyte >> 8) & 0xFF)
 #define LO_NIBBLE(fbyte) (fbyte & 0xFF)
 
+#define MAX_VAL(a, b)      (((a) > (b)) ? (a) : (b))
+#define MIN_VAL(a, b)      (((a) < (b)) ? (a) : (b))
+#define CLAMP(v, min, max) (((v) > (max)) ? (max) : (((v) < (min)) ? (min) : (v)))
+
 // -------- typedefs --------------------------------------------------------------------
 
 typedef enum opt_arg_req {

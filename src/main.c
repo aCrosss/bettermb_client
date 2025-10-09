@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -15,15 +16,68 @@
 global_t globals = {0};
 
 int
+build_wdata_bits(func_cxt_t *fcxt, u8 data[MB_MAX_WRITE_BITS]) {
+    int to_write = CLAMP(globals.cxt.wcount, 0, MB_MAX_WRITE_BITS);
+    fcxt->wcount = to_write;
+
+    if (globals.random) {
+        for (int i = 0; i < to_write; i++) {
+            data[i] = rand() % 2;
+        }
+    } else {
+        to_write = CLAMP(to_write, 0, WD_MAX_LEN);
+        for (int i = 0; i < to_write; i++) {
+            // write what we have, everything else will be 0
+            data[i] = globals.cxt.wdata[i];
+        }
+    }
+}
+
+int
+build_wdata_regs(func_cxt_t *fcxt, u8 data[MB_MAX_WRITE_BITS]) {
+    int  fflags    = fc_flags(fcxt->fc);
+    int  max_write = fflags & FCF_READ ? MB_MAX_WR_WRITE_REGS : MB_MAX_WRITE_REGS;
+    u16 *write     = (void *)data;
+
+    int to_write = CLAMP(globals.cxt.wcount, 0, max_write);
+    fcxt->wcount = to_write;
+
+    if (globals.random) {
+        for (int i = 0; i < to_write; i++) {
+            write[i] = rand() % 0xFFFF;
+        }
+    } else {
+        to_write = CLAMP(to_write, 0, WD_MAX_LEN);
+        for (int i = 0; i < to_write; i++) {
+            // write what we have, everything else will be 0
+            write[i] = globals.cxt.wdata[i];
+        }
+    }
+}
+
+int
 send_request(frame_t *frame) {
     func_cxt_t fcxt = {
-      .fc       = globals.cxt.fc,
-      .raddress = globals.cxt.raddress,
-      .rcount   = globals.cxt.rcount,
+      .fc = globals.cxt.fc,
     };
-    u8 data[1] = {0};
+    // can't write anything more than that anyway
+    u8 wdata[MB_MAX_WRITE_BITS] = {0};
 
-    int pdu_len = build_pdu(frame->pdu, data, fcxt);
+    int fflag = fc_flags(fcxt.fc);
+    if (fflag & FCF_READ) {
+        fcxt.raddress = globals.cxt.raddress;
+        fcxt.rcount   = globals.cxt.rcount;
+    }
+    if (fflag & FCF_WRITE) {
+        fcxt.waddress = globals.cxt.waddress;
+        if (fflag & FCF_BITS) {
+            build_wdata_bits(&fcxt, wdata);
+        } else {
+            build_wdata_regs(&fcxt, wdata);
+        }
+    }
+
+    int pdu_len = build_pdu(frame->pdu, wdata, fcxt);
     if (pdu_len > 0) {
         frame->pdu_len = pdu_len;
     } else {
@@ -154,6 +208,7 @@ main(int argc, char *argv[]) {
     }
 
     init_screen(&globals);
+    // log_line("Better Modbus Client v1.0");
     log_line("> tui started");
 
     open_uplink(&globals);

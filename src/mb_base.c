@@ -51,23 +51,6 @@ bit_data_to_bytes(u8 *data, int data_len, u8 *out) {
     }
 }
 
-int
-fc_flags(int function_code) {
-    switch (function_code) {
-    case MB_FC_READ_COILS:
-    case MB_FC_READ_DISCRETE_INPUTS    : return FCF_READ | FCF_BITS;
-    case MB_FC_READ_HOLDING_REGISTERS  :
-    case MB_FC_READ_INPUT_REGISTERS    : return FCF_READ;
-    case MB_FC_WRITE_SINGLE_COIL       : return FCF_WRITE | FCF_BITS;
-    case MB_FC_WRITE_SINGLE_REGISTER   : return FCF_WRITE;
-    case MB_FC_WRITE_MULTIPLE_COILS    : return FCF_WRITE | FCF_BITS;
-    case MB_FC_WRITE_MULTIPLE_REGISTERS: return FCF_WRITE;
-    case MB_FC_WRITE_AND_READ_REGISTERS: return FCF_WRITE | FCF_READ;
-    }
-
-    return -1;
-}
-
 /* Table of CRC values for high-order byte */
 static const u8 table_crc_hi[] = {
   0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80,
@@ -135,7 +118,7 @@ lrc8(u8 *data, u16 len) {
 // ======================================================================================
 
 int
-build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata) {
+build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *wdata, func_cxt_t fdata) {
     int fc = fdata.fc;
 
     u8 byte_count = 0;
@@ -155,15 +138,15 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata) {
     case MB_FC_WRITE_SINGLE_COIL:
         pdu[1] = HI_NIBBLE(fdata.waddress);
         pdu[2] = LO_NIBBLE(fdata.waddress);
-        pdu[3] = (data[0] == 0) ? 0x00 : 0xFF;
+        pdu[3] = (wdata[0] == 0) ? 0x00 : 0xFF;
         pdu[4] = 0x00;
         return 5;
 
     case MB_FC_WRITE_SINGLE_REGISTER:
         pdu[1] = HI_NIBBLE(fdata.waddress);
         pdu[2] = LO_NIBBLE(fdata.waddress);
-        pdu[3] = data[0];
-        pdu[4] = data[1];
+        pdu[3] = wdata[0];
+        pdu[4] = wdata[1];
         return 5;
 
     case MB_FC_WRITE_MULTIPLE_COILS:
@@ -176,7 +159,7 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata) {
         pdu[5]     = byte_count;
 
         u8 write_buf[MB_MAX_ADU_LEN] = {0};
-        bit_data_to_bytes(data, fdata.wcount, write_buf);
+        bit_data_to_bytes(wdata, fdata.wcount, write_buf);
         for (int i = 0; i < byte_count; ++i) {
             pdu[6 + i] = write_buf[i];
         }
@@ -193,8 +176,8 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata) {
         pdu[5]     = byte_count;
 
         for (int i = 0; i < byte_count; ++i) {
-            pdu[6 + i * 2] = data[i * 2];
-            pdu[7 + i * 2] = data[i * 2 + 1];
+            pdu[6 + i * 2] = wdata[i * 2];
+            pdu[7 + i * 2] = wdata[i * 2 + 1];
         }
 
         return 6 + byte_count;
@@ -214,8 +197,8 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *data, func_cxt_t fdata) {
         pdu[9]     = byte_count;
 
         for (int i = 0; i < byte_count; ++i) {
-            pdu[10 + i * 2] = data[i * 2];
-            pdu[11 + i * 2] = data[i * 2 + 1];
+            pdu[10 + i * 2] = wdata[i * 2];
+            pdu[11 + i * 2] = wdata[i * 2 + 1];
         }
 
         return 10 + byte_count;

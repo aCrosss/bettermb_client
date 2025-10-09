@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define WD_MAX_LEN 125 // maximum ammount of custom coils/regs data to write
+
 typedef struct {
     char device[32];
     int  baud;
@@ -25,6 +27,8 @@ typedef struct {
     int  wcount;
     int  raddress;
     int  rcount;
+
+    u16 wdata[WD_MAX_LEN];
 
     u16 tid;
     int fd;
