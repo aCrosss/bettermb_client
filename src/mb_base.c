@@ -35,6 +35,19 @@ str_fc(fc_t fc) {
     }
 }
 
+const char *
+str_valid_err(mb_validation_err_t err) {
+    switch (err) {
+    case MB_VALIDATION_ERROR_OK          : return "ok";
+    case MB_VALIDATION_ERROR_SHORT       : return "too short";
+    case MB_VALIDATION_ERROR_BAD_CRC     : return "bad crc";
+    case MB_VALIDATION_ERROR_INVALID_DATA: return "invalid data";
+    case MB_VALIDATION_ERROR_BAD_LEN     : return "bad len";
+    case MB_VALIDATION_ERROR_BAD_LRC     : return "bad lrc";
+    case MB_VALIDATION_ERROR_BAD_PROTO_ID: return "bad protocol id";
+    }
+}
+
 // ======================================================================================
 // Misc
 // ======================================================================================

@@ -20,7 +20,7 @@ typedef struct {
 
 typedef struct {
     mb_protocol_t protocol;
-    mb_protocol_t prev_proto;
+    mb_protocol_t last_run_was_on;
 
     fc_t fc;
     int  waddress;
@@ -51,8 +51,7 @@ typedef struct global {
 
     int slave_id_start;
     int slave_id_end;
-    int response_timeout;
-    int request_count;
+    int response_timeout; // ms
 
     u8  running;
     int timeout; // ms

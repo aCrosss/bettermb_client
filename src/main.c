@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,11 +103,10 @@ send_request(frame_t *frame) {
     tcflush(globals.cxt.fd, TCIFLUSH);
 
     if (bytes_send > 0) {
-        log_adu(&globals, adu, adu_len, frame->protocol, DS_OUT_OK);
+        log_adu(adu, adu_len, frame->protocol, DS_OUT_OK);
         return RC_SUCCESS;
     } else {
-        // TOOD: make more informative error message
-        log_traffic_str(&globals, "failed to send", DS_OUT_FAIL);
+        log_traffic_str("failed to send", DS_OUT_FAIL);
         return RC_FAIL;
     }
 }
@@ -128,7 +128,7 @@ read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u16 expected) {
         }
 
         if (now_ms() - globals.time_start > globals.response_timeout) {
-            log_traffic_str(&globals, "timed out", DS_IN_FAIL);
+            log_traffic_str("timed out", DS_IN_FAIL);
             globals.stats.timeouts++;
             return RC_FAIL;
         }
@@ -150,25 +150,30 @@ recv_response(frame_t *req_frame) {
         return RC_FAIL;
     }
 
-    if (!mb_is_adu_valid(req_frame->protocol, adu, adu_len)) {
+    int verr = mb_is_adu_valid(req_frame->protocol, adu, adu_len);
+    if (verr == MB_VALIDATION_ERROR_OK) {
         frame_t rsp_frame = {0};
         mb_extract_frame(req_frame->protocol, adu, adu_len, &rsp_frame);
 
-        // can be response that we already count as 'timed out, skip it
+        // can be response that we already count as 'timed out, try another
         if (req_frame->tid != rsp_frame.tid) {
             return recv_response(req_frame);
         }
 
         if (check_req_rsp_pdu(req_frame->pdu, req_frame->pdu_len, rsp_frame.pdu, rsp_frame.pdu_len)) {
-            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_OK);
+
+            log_adu(adu, adu_len, rsp_frame.protocol, DS_IN_OK);
             globals.stats.success++;
             return RC_SUCCESS;
         } else {
-            log_adu(&globals, adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
+            log_adu(adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
             globals.stats.fails++;
-            log_line("! recieved response is invalid");
+            log_traffic_str("pdu invalid", DS_IN_FAIL);
             return RC_FAIL;
         }
+    } else {
+        globals.stats.fails++;
+        log_traffic_str(str_valid_err(verr), DS_IN_FAIL);
     }
 }
 
@@ -196,32 +201,62 @@ make_request() {
     redraw_header(&globals);
 }
 
+void
+exit_cleanup() {
+    destroy_tui();
+    exit(0);
+}
+
 int
 main(int argc, char *argv[]) {
-    if (init_client(argc, argv, &globals) < 0) {
+    if (init_client(argc, argv, &globals) != RC_SUCCESS) {
         return -1;
     }
 
-    init_screen(&globals);
-    // log_line("Better Modbus Client v1.0");
+    // before client is closed by any reason we must be sure that ncurses is
+    // correctly finished, otherwise it will break user console
+    signal(SIGINT, exit_cleanup);
+    signal(SIGTERM, exit_cleanup);
+    signal(SIGSEGV, exit_cleanup);
+    signal(SIGABRT, exit_cleanup);
+
+    init_tui(&globals);
+    log_line("Better Modbus Client v1.0");
     log_line("> tui started");
 
     open_uplink(&globals);
+    globals.cxt.last_run_was_on = globals.cxt.protocol;
 
+    // must be after init_tui because of pointer to globals
     pthread_t tinput;
-    pthread_create(&tinput, NULL, input_thread, (void *)&globals);
+    pthread_create(&tinput, NULL, input_thread, NULL);
 
     while (1) {
         if (globals.running) {
+            // make sure we run request on according connection
+            if (globals.cxt.last_run_was_on == MB_PROTOCOL_TCP) {
+                if (globals.cxt.protocol == MB_PROTOCOL_RTU || globals.cxt.protocol == MB_PROTOCOL_ASCII) {
+                    if (!relink(&globals)) {
+                        globals.running = FALSE;
+                    }
+                }
+            } else {
+                if (globals.cxt.protocol == MB_PROTOCOL_TCP) {
+                    if (!relink(&globals)) {
+                        globals.running = FALSE;
+                    }
+                }
+            }
+
             make_request();
+            globals.cxt.last_run_was_on = globals.cxt.protocol;
         }
 
         msleep(globals.timeout);
     }
 
-    // pthread_exit(NULL);
     getchar();
 
-    endwin();
+    destroy_tui();
     return 0;
 }

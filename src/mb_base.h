@@ -63,5 +63,7 @@ void
 str_curr_endpoint(char out[32], global_t *global);
 const char *
 str_fc(fc_t fc);
+const char *
+str_valid_err(mb_validation_err_t err);
 
 #endif

@@ -79,11 +79,9 @@ help(const char *progname) {
       "                                           Default: 1.\n\n"
       " Miscellaneous options:\n"
       "  -q, --response_timeout=NUM               Response timeout for incoming modbus packet.\n"
-      "                                           Default: 500.\n"
+      "                                           Default: 100.\n"
       "  -l, --random                             Use random bytes as data for write commands.\n"
       "                                           Default: No.\n"
-      "  -c, --count=NUM                          How many times to send request (0 - don't stop sending)\n"
-      "                                           Default: 1.\n"
       "  -T, --timeout=NUM                        Timeout between requests (ms) (0-600000).\n"
       "                                           Default: 1000.\n\n"
       "  -h, --help                               Give this help list\n"
@@ -120,7 +118,6 @@ handle_startup_args(int argc, char **argv, global_t *global) {
           {"write-addr", OPT_ARG_REQUIRED, 0, 'W'},
           {"write-count", OPT_ARG_REQUIRED, 0, 'w'},
           {"response-timeout", OPT_ARG_REQUIRED, 0, 'q'},
-          {"count", OPT_ARG_REQUIRED, 0, 'c'},
           {"timeout", OPT_ARG_REQUIRED, 0, 'T'},
           {0},
         };
@@ -130,7 +127,7 @@ handle_startup_args(int argc, char **argv, global_t *global) {
          * a:  - argument with value
          * a:: - argument with optional value, will return null w/o value
          */
-        c = getopt_long(argc, argv, "t:b:p:ls:e:f:R:r:W:w:q:c:T:", long_options, &option_index);
+        c = getopt_long(argc, argv, "t:b:p:ls:e:f:R:r:W:w:q:T:", long_options, &option_index);
         if (c == -1) {
             break;
         }
@@ -141,24 +138,24 @@ handle_startup_args(int argc, char **argv, global_t *global) {
         case 0:
             if (strcmp(long_options[option_index].name, "data-bits") == 0) {
                 if (parse_int(optarg, &global->sconf.data_bits) < 0) {
-                    return -1;
+                    return RC_ERROR;
                 }
             } else if (strcmp(long_options[option_index].name, "stop-bits") == 0) {
                 if (parse_int(optarg, &global->sconf.stop_bits) < 0) {
-                    return -1;
+                    return RC_ERROR;
                 }
             }
             break;
 
         case 't':
             if (parse_int(optarg, &global->tcp_endp.tcp_port) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'b':
             if (parse_int(optarg, &global->sconf.baud) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
@@ -166,7 +163,7 @@ handle_startup_args(int argc, char **argv, global_t *global) {
             global->sconf.parity = *optarg;
             if (global->sconf.parity != 'N' && global->sconf.parity != 'O' && global->sconf.parity != 'E') {
                 printf("invalid parity value: '%s', allowed: N, O or E\n", optarg);
-                return -1;
+                return RC_ERROR;
             }
             break;
 
@@ -174,19 +171,19 @@ handle_startup_args(int argc, char **argv, global_t *global) {
 
         case 's':
             if (parse_int(optarg, &global->slave_id_start) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'e':
             if (parse_int(optarg, &global->slave_id_end) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'f':
             if (parse_int(optarg, &fc) < 0) {
-                return -1;
+                return RC_ERROR;
             } else {
                 global->cxt.fc = fc;
             }
@@ -194,48 +191,42 @@ handle_startup_args(int argc, char **argv, global_t *global) {
 
         case 'R':
             if (parse_int(optarg, &global->cxt.raddress) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'r':
             if (parse_int(optarg, &global->cxt.rcount) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'W':
             if (parse_int(optarg, &global->cxt.waddress) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'w':
             if (parse_int(optarg, &global->cxt.wcount) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'q':
             if (parse_int(optarg, &global->response_timeout) < 0) {
-                return -1;
-            }
-            break;
-
-        case 'c':
-            if (parse_int(optarg, &global->request_count) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
         case 'T':
             if (parse_int(optarg, &global->timeout) < 0) {
-                return -1;
+                return RC_ERROR;
             }
             break;
 
-        case 'h': help(""); return 0;
-        default : help(""); return 0;
+        case 'h': help(""); return RC_FAIL;
+        default : help(""); return RC_FAIL;
         }
     }
 
@@ -245,11 +236,11 @@ handle_startup_args(int argc, char **argv, global_t *global) {
     // for (; (argv[i]) && (j < MB_MAX_WRITE_BITS); ++i, ++j) {
     //     if (parse_int(argv[i], &globals.write_data[j]) < 0) {
     //         printf("invalid write value\n");
-    //         return -1;
+    //         return RC_ERROR;
     //     }
     // }
 
-    return 1;
+    return RC_SUCCESS;
 }
 
 int
@@ -273,13 +264,12 @@ init_client(int argc, char **argv, global_t *global) {
 
     global->response_timeout = 100;
     global->random           = 0;
-    global->request_count    = 1;
     global->timeout          = 1000;
 
     const char *progname = argv[0];
     if (argc < 3) {
         help(progname);
-        return -1;
+        return RC_ERROR;
     }
 
     char *mode = argv[1];
@@ -306,7 +296,7 @@ init_client(int argc, char **argv, global_t *global) {
 
         strncpy(global->sconf.device, endp, 32);
         break;
-    default: printf("Invalid modbus mode\n"); return -1;
+    default: printf("Invalid modbus mode\n"); return RC_ERROR;
     }
 
     return handle_startup_args(argc, argv, global);

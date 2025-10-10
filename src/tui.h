@@ -35,18 +35,20 @@ typedef enum {
 } dirstat_t;
 
 void
-init_screen(global_t *global);
+init_tui(global_t *global);
 void
-redraw_header(global_t *global);
+destroy_tui();
+void
+redraw_header();
 void *
-input_thread(void *global);
+input_thread();
 void
 log_line(const char *line);
 void
 log_linef(const char *format, ...);
 void
-log_traffic_str(global_t *g, const char *str, dirstat_t ds);
+log_traffic_str(const char *str, dirstat_t ds);
 void
-log_adu(global_t *g, u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds);
+log_adu(u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds);
 
 #endif

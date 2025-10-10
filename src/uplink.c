@@ -40,7 +40,7 @@ static int
 open_serial(serial_cfg *sconf) {
     int fd = open(sconf->device, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) {
-        log_line("! failed to oped fd");
+        log_linef("! failed to create serial connection: %s", strerror(errno));
         return RC_ERROR;
     }
 
@@ -91,11 +91,8 @@ open_serial(serial_cfg *sconf) {
         return RC_ERROR;
     }
 
-    char buff[64] = {0};
-    sprintf(buff, "> openned serial connection: %d", fd);
-    log_line(buff);
+    log_linef("> openned serial connection (fd: %d)", fd);
 
-    // log_line("> openned serial");
     return fd;
 }
 
@@ -103,7 +100,7 @@ int
 open_tcp(tcp_endp *endp) {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | O_NONBLOCK, 0);
     if (fd < 0) {
-        log_linef("! failed to oped fd: %s", strerror(errno));
+        log_linef("! failed to create tcp connection: %s", strerror(errno));
         return RC_ERROR;
     }
 
@@ -117,15 +114,13 @@ open_tcp(tcp_endp *endp) {
 
     if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
         if (errno != EINPROGRESS) {
-            log_linef("! failed to bind socket: %s", strerror(errno));
+            log_linef("! failed to connect socket (fd: %s)", strerror(errno));
             close(fd);
             return RC_ERROR;
         }
     }
 
-    char buff[64] = {0};
-    sprintf(buff, "> oppened tcp connection (%d): %s:%d", fd, endp->host, endp->tcp_port);
-    log_line(buff);
+    log_linef("> oppened tcp connection (fd: %d): %s:%d", fd, endp->host, endp->tcp_port);
 
     return fd;
 }
@@ -144,11 +139,6 @@ open_uplink(global_t *global) {
         return RC_FAIL;
     }
 
-    // doesn't work with file descriptors
-    // if (!set_socket_timeout(fd, global->response_timeout)) {
-    //     return RC_FAIL;
-    // }
-
     global->cxt.fd = fd;
     return RC_SUCCESS;
 }
@@ -162,20 +152,10 @@ relink(global_t *global) {
 
     log_linef("> reopening connection");
     // reopen new socket
-    open_uplink(global);
-}
-
-int
-set_socket_timeout(int fd, u32 ms) {
-    struct timeval timeout;
-    timeout.tv_sec  = ms / 1000;
-    timeout.tv_usec = (ms % 1000) * 1000;
-
-    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0) {
-        log_linef("! failed to setsockopt: %d", errno);
-        ENOPROTOOPT;
+    if (open_uplink(global)) {
+        global->cxt.last_run_was_on = global->cxt.protocol;
+        return RC_SUCCESS;
+    } else {
         return RC_FAIL;
     }
-
-    return RC_SUCCESS;
 }
