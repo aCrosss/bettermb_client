@@ -105,4 +105,18 @@ typedef enum {
     MB_PROTOCOL_MAX,
 } mb_protocol_t;
 
+// Exception codes
+typedef enum mb_ex {
+    MB_EX_ILLEGAL_FUNCTION        = 0x01,
+    MB_EX_ILLEGAL_DATA_ADDRESS    = 0x02,
+    MB_EX_ILLEGAL_DATA_VALUE      = 0x03,
+    MB_EX_SLAVE_OR_SERVER_FAILURE = 0x04,
+    MB_EX_ACKNOWLEDGE             = 0x05,
+    MB_EX_SLAVE_OR_SERVER_BUSY    = 0x06,
+    MB_EX_MEMORY_PARITY           = 0x08,
+    MB_EX_GATEWAY_PATH            = 0x0A,
+    MB_EX_GATEWAY_TARGET          = 0x0B,
+    MB_EX_MAX
+} mb_ex_t;
+
 #endif

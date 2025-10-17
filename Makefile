@@ -5,6 +5,10 @@ FLAGS   = -fsanitize=address
 all:
 	gcc -o bin/bmb_clinet ${FLAGS} ${SOURCES} ${LIBS}
 
-.PHHONY: test
+unsane:
+	gcc -o bin/bmb_clinet ${SOURCES} ${LIBS}
+
+.PHHONY: test not-sanitized
 
 test: all
+not-sanitized: unsane

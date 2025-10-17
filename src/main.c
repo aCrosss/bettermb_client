@@ -17,6 +17,8 @@
 
 global_t globals = {0};
 
+// -------------------- Request section ---------------------------------------------------
+
 int
 build_wdata_bits(func_cxt_t *fcxt, u8 data[MB_MAX_WRITE_BITS]) {
     int to_write = CLAMP(globals.cxt.wcount, 0, MB_MAX_WRITE_BITS);
@@ -65,6 +67,7 @@ send_request(frame_t *frame) {
     // can't write anything more than that anyway
     u8 wdata[MB_MAX_WRITE_BITS] = {0};
 
+    // build data for request
     int fflag = fc_flags(fcxt.fc);
     if (fflag & FCF_READ) {
         fcxt.raddress = globals.cxt.raddress;
@@ -78,8 +81,8 @@ send_request(frame_t *frame) {
             build_wdata_regs(&fcxt, wdata);
         }
     }
-    frame->expected_rsp_adu_len = client_get_expected_rsp_adu_len(frame->protocol, &fcxt);
 
+    // build pdu
     int pdu_len = build_pdu(frame->pdu, wdata, fcxt);
     if (pdu_len > 0) {
         frame->pdu_len = pdu_len;
@@ -88,14 +91,15 @@ send_request(frame_t *frame) {
         return RC_FAIL;
     }
 
+    // build adu
     u8 adu[MB_MAX_ADU_LEN] = {0};
 
     int adu_len = build_adu(adu, frame);
     if (adu_len <= 0) {
-        log_line("! failed to build adu");
         return RC_FAIL;
     }
 
+    // try write to fd
     globals.stats.requests++;
     int bytes_send = write(globals.cxt.fd, adu, adu_len);
 
@@ -105,21 +109,36 @@ send_request(frame_t *frame) {
     if (bytes_send > 0) {
         log_adu(adu, adu_len, frame->protocol, DS_OUT_OK);
         return RC_SUCCESS;
+    } else if (errno == EPIPE || errno == ENOTTY) {
+        log_linef("! bad fd: %s", strerror(errno));
+        log_linef("! client request handling stopped, fd closed");
+
+        globals.running = FALSE;
+        close(globals.cxt.fd);
+        globals.cxt.fd = -1;
+        redraw_header();
+        return RC_FAIL;
     } else {
         log_traffic_str("failed to send", DS_OUT_FAIL);
         return RC_FAIL;
     }
 }
 
+// -------------------- Response section --------------------------------------------------
+
 int
-read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len, u16 expected) {
+read_nonblock(u8 out[MB_MAX_ADU_LEN], int *out_len) {
     u32 pos                  = 0;
     u8  buff[MB_MAX_ADU_LEN] = {0};
     int temp_len             = 0;
+    u16 expected             = 0;
 
     while (1) {
+        expected = mb_get_expected_adu_len(globals.cxt.protocol, out, pos, MB_DIR_RESPONSE);
         if (expected < 0) {
             return RC_FAIL;
+        } else if (expected == 0) {
+            expected = MB_MAX_ADU_LEN;
         }
 
         int add = read(globals.cxt.fd, &out[pos], expected - pos);
@@ -146,7 +165,7 @@ recv_response(frame_t *req_frame) {
     u8  adu[MB_MAX_ADU_LEN] = {0};
     int adu_len             = 0;
 
-    if (!read_nonblock(adu, &adu_len, req_frame->expected_rsp_adu_len)) {
+    if (!read_nonblock(adu, &adu_len)) {
         return RC_FAIL;
     }
 
@@ -161,14 +180,12 @@ recv_response(frame_t *req_frame) {
         }
 
         if (check_req_rsp_pdu(req_frame->pdu, req_frame->pdu_len, rsp_frame.pdu, rsp_frame.pdu_len)) {
-
             log_adu(adu, adu_len, rsp_frame.protocol, DS_IN_OK);
             globals.stats.success++;
             return RC_SUCCESS;
         } else {
             log_adu(adu, adu_len, rsp_frame.protocol, DS_IN_FAIL);
             globals.stats.fails++;
-            log_traffic_str("pdu invalid", DS_IN_FAIL);
             return RC_FAIL;
         }
     } else {
@@ -176,6 +193,8 @@ recv_response(frame_t *req_frame) {
         log_traffic_str(str_valid_err(verr), DS_IN_FAIL);
     }
 }
+
+// -------------------- Base section ------------------------------------------------------
 
 int
 make_request() {
@@ -190,7 +209,7 @@ make_request() {
       .tid      = tid,
     };
 
-    if (!send_request(&frame)) {
+    if (send_request(&frame) != RC_SUCCESS) {
         return RC_FAIL;
     }
 
@@ -213,6 +232,9 @@ main(int argc, char *argv[]) {
         return -1;
     }
 
+    // stop write breacking client
+    signal(SIGPIPE, SIG_IGN);
+
     // before client is closed by any reason we must be sure that ncurses is
     // correctly finished, otherwise it will break user console
     signal(SIGINT, exit_cleanup);
@@ -221,7 +243,7 @@ main(int argc, char *argv[]) {
     signal(SIGABRT, exit_cleanup);
 
     init_tui(&globals);
-    log_line("Better Modbus Client v1.0");
+    log_line("Better Modbus Client v1.1");
     log_line("> tui started");
 
     open_uplink(&globals);
@@ -232,25 +254,37 @@ main(int argc, char *argv[]) {
     pthread_create(&tinput, NULL, input_thread, NULL);
 
     while (1) {
-        if (globals.running) {
-            // make sure we run request on according connection
-            if (globals.cxt.last_run_was_on == MB_PROTOCOL_TCP) {
-                if (globals.cxt.protocol == MB_PROTOCOL_RTU || globals.cxt.protocol == MB_PROTOCOL_ASCII) {
-                    if (!relink(&globals)) {
-                        globals.running = FALSE;
-                    }
-                }
-            } else {
-                if (globals.cxt.protocol == MB_PROTOCOL_TCP) {
-                    if (!relink(&globals)) {
-                        globals.running = FALSE;
-                    }
+        if (!globals.running) {
+            continue;
+        }
+
+        if (globals.cxt.fd == -1) {
+            // try reconnect just once
+            if (!relink(&globals)) {
+                log_linef("! failed to reconnect: %s", strerror(errno));
+                globals.running = FALSE;
+                redraw_header();
+                continue;
+            }
+        }
+
+        // make sure we run request on according connection
+        if (globals.cxt.last_run_was_on == MB_PROTOCOL_TCP) {
+            if (globals.cxt.protocol == MB_PROTOCOL_RTU || globals.cxt.protocol == MB_PROTOCOL_ASCII) {
+                if (!relink(&globals)) {
+                    globals.running = FALSE;
                 }
             }
-
-            make_request();
-            globals.cxt.last_run_was_on = globals.cxt.protocol;
+        } else {
+            if (globals.cxt.protocol == MB_PROTOCOL_TCP) {
+                if (!relink(&globals)) {
+                    globals.running = FALSE;
+                }
+            }
         }
+
+        make_request();
+        globals.cxt.last_run_was_on = globals.cxt.protocol;
 
         msleep(globals.timeout);
     }

@@ -212,8 +212,8 @@ init_tui(global_t *globals) {
     refresh();
 
     // init header
-    u8 header_bottom = 16;
-    wheader          = newwin(header_bottom, COLS, 0, 0);
+    int header_bottom = 16;
+    wheader           = newwin(header_bottom, COLS, 0, 0);
     redraw_header();
 
     // init logd
