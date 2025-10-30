@@ -201,7 +201,13 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *wdata, func_cxt_t fdata) {
         pdu[4] = LO_NIBBLE(fdata.wcount);
 
         byte_count = (fdata.wcount + 7) / 8;
-        pdu[5]     = byte_count;
+
+        if (6 + byte_count >= MB_MAX_PDU_LEN) {
+            log_linef("! failed to build pdu: too much data to write");
+            return -1;
+        }
+
+        pdu[5] = byte_count;
 
         u8 write_buf[MB_MAX_ADU_LEN] = {0};
         bit_data_to_bytes(wdata, fdata.wcount, write_buf);
@@ -218,9 +224,15 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *wdata, func_cxt_t fdata) {
         pdu[4] = LO_NIBBLE(fdata.wcount);
 
         byte_count = fdata.wcount * 2;
-        pdu[5]     = byte_count;
 
-        for (int i = 0; i < byte_count; ++i) {
+        if (6 + byte_count >= MB_MAX_PDU_LEN) {
+            log_linef("! failed to build pdu: too much data to write");
+            return -1;
+        }
+
+        pdu[5] = byte_count;
+
+        for (int i = 0; i < byte_count / 2; ++i) {
             pdu[6 + i * 2] = wdata[i * 2];
             pdu[7 + i * 2] = wdata[i * 2 + 1];
         }
@@ -239,9 +251,15 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *wdata, func_cxt_t fdata) {
         pdu[8] = LO_NIBBLE(fdata.wcount);
 
         byte_count = fdata.wcount * 2;
-        pdu[9]     = byte_count;
 
-        for (int i = 0; i < byte_count; ++i) {
+        if (10 + byte_count >= MB_MAX_PDU_LEN) {
+            log_linef("! failed to build pdu: too much data to write");
+            return -1;
+        }
+
+        pdu[9] = byte_count;
+
+        for (int i = 0; i < byte_count / 2; ++i) {
             pdu[10 + i * 2] = wdata[i * 2];
             pdu[11 + i * 2] = wdata[i * 2 + 1];
         }
@@ -249,6 +267,7 @@ build_pdu(u8 pdu[MB_MAX_PDU_LEN], u8 *wdata, func_cxt_t fdata) {
         return 10 + byte_count;
     }
 
+    log_linef("! failed to build pdu: invalid fc");
     return -1;
 }
 

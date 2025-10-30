@@ -51,7 +51,6 @@ build_wdata_regs(func_cxt_t *fcxt, u8 data[MB_MAX_WRITE_BITS]) {
             write[i] = rand() % 0xFFFF;
         }
     } else {
-        to_write = CLAMP(to_write, 0, WD_MAX_LEN);
         for (int i = 0; i < to_write; i++) {
             // write what we have, everything else will be 0
             write[i] = globals.cxt.wdata[i];
@@ -87,7 +86,6 @@ send_request(frame_t *frame) {
     if (pdu_len > 0) {
         frame->pdu_len = pdu_len;
     } else {
-        log_line("! failed to build pdu");
         return RC_FAIL;
     }
 
@@ -102,6 +100,7 @@ send_request(frame_t *frame) {
     // try write to fd
     globals.stats.requests++;
     int bytes_send = write(globals.cxt.fd, adu, adu_len);
+    /* it's my homie, mr. write*/
 
     // clear all pesky leftovers
     tcflush(globals.cxt.fd, TCIFLUSH);
