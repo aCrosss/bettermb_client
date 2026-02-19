@@ -157,9 +157,8 @@ tcp_ednp_from_str(tcp_endp *tcp, char *host, char *port) {
 }
 
 int
-uid_from_str(int *start, int *end, char *s_start, char *s_end) {
+uid_from_str(int *start, int *end, char *s_start, char *s_end, u8 sequence) {
     trim_spaces(s_start);
-    trim_spaces(s_end);
 
     if (parse_int(s_start, start) < 0) {
         log_linef("! invalid uid start: %d", *start);
@@ -169,17 +168,23 @@ uid_from_str(int *start, int *end, char *s_start, char *s_end) {
         return RC_FAIL;
     }
 
-    if (parse_int(s_end, end) < 0) {
-        log_linef("! invalid uid end: %d", *end);
-        return RC_FAIL;
-    } else if (*end < 0 || *end > 255) {
-        log_linef("! uid end must be between 0 and 255: %d", *end);
-        return RC_FAIL;
-    }
+    if (sequence) {
+        trim_spaces(s_end);
 
-    if (*start > *end) {
-        log_linef("! start must be less or equal to end");
-        return RC_FAIL;
+        if (parse_int(s_end, end) < 0) {
+            log_linef("! invalid uid end: %d", *end);
+            return RC_FAIL;
+        } else if (*end < 0 || *end > 255) {
+            log_linef("! uid end must be between 0 and 255: %d", *end);
+            return RC_FAIL;
+        }
+
+        if (*start > *end) {
+            log_linef("! start must be less or equal to end");
+            return RC_FAIL;
+        }
+    } else {
+        *end = *start;
     }
 
     return RC_SUCCESS;

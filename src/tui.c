@@ -548,47 +548,83 @@ tui_endpoint() {
 
 // ---------------------------- UID --------------------------------------------
 
+char *use_uid_seq[] = {
+  "single",
+  "sequence",
+  NULL,
+};
+
+// clang-format off
+void static inline
+tui_uid_draw(WINDOW *win, FORM *form, u8 sequence) {
+    // clang-format on
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Unit ID");
+
+    if (sequence) {
+        mvwprintw(win, 1, 1, "Sequence:  ");
+        mvwprintw(win, 2, 1, "UID Start: ");
+        mvwprintw(win, 3, 1, "UID End:   ");
+        mvwprintw(win, 5, 1, "F1 - Submit");
+        mvwprintw(win, 6, 1, "F2 - Cancel");
+    } else {
+        mvwprintw(win, 1, 1, "Sequence:   ");
+        mvwprintw(win, 2, 1, "Single UID: ");
+        mvwprintw(win, 3, 1, "            ");
+
+        mvwprintw(win, 5, 1, "F1 - Submit");
+        mvwprintw(win, 6, 1, "F2 - Cancel");
+    }
+
+    wrefresh(win);
+    pos_form_cursor(form);
+}
+
 void
 tui_uid() {
-    FIELD *field[3];
+    FIELD *field[4];
     FORM  *form;
-    u8     nfields = 2; // Magic number but fine; it's maximum filed for both Serial and TCP
+    u8     nfields = 3; // Magic number but fine; select, start/singe uid, uid end
 
-    //                   h  w  y              x
-    WINDOW *win = NEW_WIN(7, 32, LINES / 2 - 5, COLS / 2 - 16);
+    u8 sequence = pglobals->sequence_uid; // 0 - single uid, 1 - uid start, uid end
+
+    //                    h  w  y              x
+    WINDOW *win = NEW_WIN(8, 32, LINES / 2 - 5, COLS / 2 - 16);
     keypad(win, TRUE);
 
-    // end field
+    // select
     field[0] = NEW_FIELD(1, 14, 0, 0);
-    set_field_back(field[0], A_UNDERLINE);
-    set_field_type(field[0], TYPE_INTEGER, 0, 0, 255);
-    char buff[16] = {0};
-    snprintf(buff, 16, "%d", pglobals->slave_id_start);
-    set_field_buffer(field[0], 0, buff);
-    // end field
+    set_field_type(field[0], TYPE_ENUM, use_uid_seq, 0, 0);
+    set_field_buffer(field[0], 0, use_uid_seq[sequence]);
+
+    // start uid field
     field[1] = NEW_FIELD(1, 14, 1, 0);
     set_field_back(field[1], A_UNDERLINE);
     set_field_type(field[1], TYPE_INTEGER, 0, 0, 255);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->slave_id_end);
+    char buff[16] = {0};
+    snprintf(buff, 16, "%d", pglobals->slave_id_start);
     set_field_buffer(field[1], 0, buff);
 
-    field[2] = NULL;
+    // end uid field
+    field[2] = NEW_FIELD(1, 14, 2, 0);
+    set_field_back(field[2], A_UNDERLINE);
+    set_field_type(field[2], TYPE_INTEGER, 0, 0, 255);
+    memset(buff, 0, 16);
+    snprintf(buff, 16, "%d", pglobals->slave_id_end);
+    set_field_buffer(field[2], 0, buff);
+    // disable uid end field if sequence is set to single
+    if (!sequence) {
+        field_opts_off(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
+    }
+
+    field[3] = NULL;
 
     form = new_form(field);
     set_form_win(form, win); //    h  w   y  x
     set_form_sub(form, DERWIN(win, 5, 16, 1, 13));
     post_form(form);
 
-    box(win, 0, 0);
-    mvwprintw(win, 0, 1, "Unit ID");
-    mvwprintw(win, 1, 1, "UID Start: ");
-    mvwprintw(win, 2, 1, "UID End:   ");
-    // mvwprintw(win, 7, 1, "Status ok");
-    mvwprintw(win, 4, 1, "F1 - Submit");
-    mvwprintw(win, 5, 1, "F2 - Cancel");
-    wrefresh(win);
-    pos_form_cursor(form);
+    tui_uid_draw(win, form, sequence);
 
     while (1) {
         int ch = wgetch(win);
@@ -598,7 +634,45 @@ tui_uid() {
         case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
         case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
         case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
-        // clang-format on
+            // clang-format on
+
+        case KEY_LEFT: {
+            form_driver(form, REQ_PREV_CHOICE);
+
+            FIELD *cur = current_field(form);
+            // 0 - index of sequence/single select field
+            if (field_index(cur) == 0) {
+                sequence = !sequence;
+
+                if (!sequence) {
+                    field_opts_off(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
+                } else {
+                    field_opts_on(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
+                }
+                tui_uid_draw(win, form, sequence);
+            }
+
+            break;
+        }
+
+        case KEY_RIGHT: {
+            form_driver(form, REQ_NEXT_CHOICE);
+
+            FIELD *cur = current_field(form);
+            // 0 - index of sequence/single select field
+            if (field_index(cur) == 0) {
+                sequence = !sequence;
+
+                if (!sequence) {
+                    field_opts_off(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
+                } else {
+                    field_opts_on(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
+                }
+                tui_uid_draw(win, form, sequence);
+            }
+
+            break;
+        }
 
         // cancel
         case KEY_F(2): close_dialog(win, form, field, nfields); return;
@@ -610,24 +684,20 @@ tui_uid() {
                 break;
             }
 
-            int start = 0;
-            int end   = 0;
-            if (uid_from_str(&start, &end, field_buffer(field[0], 0), field_buffer(field[1], 0))) {
+            int   start = 0;
+            int   end   = 0;
+            char *buff1 = field_buffer(field[1], 0);
+            char *buff2 = field_buffer(field[2], 0);
+            if (uid_from_str(&start, &end, buff1, buff2, sequence)) {
                 pglobals->slave_id_start = start;
                 pglobals->slave_id_end   = end;
+                pglobals->sequence_uid   = sequence;
+                pglobals->current_uid    = start;
                 close_dialog(win, form, field, nfields);
                 return;
             } else {
                 // Note: have to redraw after writing in log
-                box(win, 0, 0);
-                mvwprintw(win, 0, 1, "Unit ID");
-                mvwprintw(win, 1, 1, "UID Start: ");
-                mvwprintw(win, 2, 1, "UID End:   ");
-                // mvwprintw(win, 7, 1, "Status ok");
-                mvwprintw(win, 4, 1, "F1 - Submit");
-                mvwprintw(win, 5, 1, "F2 - Cancel");
-                wrefresh(win);
-                pos_form_cursor(form);
+                tui_uid_draw(win, form, sequence);
 
                 break;
             }

@@ -201,10 +201,19 @@ make_request() {
     if (globals.cxt.protocol == MB_PROTOCOL_TCP) {
         tid = globals.cxt.tid++;
     }
+
+    u8 uid = 1;
+    if (globals.sequence_uid) {
+        uid = globals.current_uid;
+        PIND_CLAM(globals.current_uid, globals.slave_id_start, globals.slave_id_end);
+    } else {
+        uid = globals.slave_id_start;
+    }
+
     frame_t frame = {
       .protocol = globals.cxt.protocol,
       .fc       = globals.cxt.fc,
-      .uid      = globals.slave_id_start,
+      .uid      = uid,
       .tid      = tid,
     };
 
