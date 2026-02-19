@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 199309L
+#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -145,7 +146,11 @@ tcp_ednp_from_str(tcp_endp *tcp, char *host, char *port) {
     trim_spaces(host);
     trim_spaces(port);
 
-    // TODO: Validate ip
+    // ip validation
+    if (!validate_ip(host)) {
+        log_linef("! invalid ip address: %s", host);
+        return RC_FAIL;
+    }
     strncpy(tcp->host, host, 16);
 
     if (parse_int(port, &tcp->tcp_port) < 0) {
@@ -338,4 +343,10 @@ fc_flags(int function_code) {
     }
 
     return -1;
+}
+
+rc_t
+validate_ip(const char *ip) {
+    ip_addr_t addr;
+    return (rc_t)inet_pton(AF_INET, ip, &addr);
 }

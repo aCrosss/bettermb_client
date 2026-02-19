@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "client_cxt.h"
+#include "helping_hand.h"
 #include "tui.h"
 #include "uplink.h"
 
@@ -286,11 +287,19 @@ init_client(int argc, char **argv, global_t *global) {
     }
 
     switch (global->cxt.protocol) {
-    case MB_PROTOCOL_TCP: strncpy(global->tcp_endp.host, endp, 16); break;
+    case MB_PROTOCOL_TCP:
+        if (!validate_ip(endp)) {
+            printf("TCP: Invalid IP Address\n");
+            return RC_FAIL;
+        }
+
+        strncpy(global->tcp_endp.host, endp, 16);
+        break;
+
     case MB_PROTOCOL_RTU:
     case MB_PROTOCOL_ASCII:
         if (access(endp, F_OK) != 0) {
-            log_linef("%s: device doesn't exist: '%s'\n", mode, endp);
+            printf("%s: Device doesn't exist: '%s'\n", mode, endp);
             return RC_FAIL;
         }
 

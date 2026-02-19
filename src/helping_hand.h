@@ -1,8 +1,10 @@
+// clang-format off
 #ifndef HElPING_HAND_H
-#    define HELPING_HAND_H
+#define HELPING_HAND_H
 
-#    include "client_cxt.h"
-#    include "types.h"
+#include "client_cxt.h"
+#include "types.h"
+// clang-format on
 
 char nibble_to_hex(u8 d);
 int  hex_to_nibble(char c);
@@ -17,5 +19,6 @@ void str_curr_endpoint(char out[32], global_t *global);
 u64  now_ms(void);
 void msleep(int ms);
 int  fc_flags(int function_code);
+rc_t validate_ip(const char *ip);
 
 #endif

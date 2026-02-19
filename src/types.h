@@ -36,17 +36,24 @@ typedef enum opt_arg_req {
     OPT_ARG_OPTIONAL,
 } opt_arg_req_t;
 
-enum {
+typedef enum {
     RC_ERROR = -1,
     RC_FAIL,
     RC_SUCCESS,
-};
+} rc_t;
 
 enum {
     REQ_SUCCEDED,
     REQ_FAILED,
     REQ_TIMED_OUT,
 };
+
+typedef struct ip_addr {
+    union {
+        u32 val_be; // big endian
+        u8  data[4];
+    };
+} ip_addr_t;
 
 // -------- modbus ----------------------------------------------------------------------
 
