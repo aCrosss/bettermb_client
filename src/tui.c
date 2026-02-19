@@ -485,7 +485,7 @@ tui_endpoint() {
         case KEY_F(1):
             // make sure all buffer available and valid
             if (form_driver(form, REQ_VALIDATION) != E_OK) {
-                break;
+                continue;
             }
 
             if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
@@ -496,6 +496,19 @@ tui_endpoint() {
                     relink(pglobals);
                     close_dialog(win, form, field, nfields);
                     return;
+                } else {
+                    // tcp config is bad, just continue with this window
+                    // Note: have to redraw after writing in log
+                    box(win, 0, 0);
+                    mvwprintw(win, 0, 1, "TCP Endpoint");
+                    mvwprintw(win, 1, 1, "Host:   ");
+                    mvwprintw(win, 2, 1, "Port:   ");
+
+                    mvwprintw(win, 8, 1, "F1 - Submit");
+                    mvwprintw(win, 9, 1, "F2 - Cancel");
+                    wrefresh(win);
+                    pos_form_cursor(form);
+                    break;
                 }
             } else {
                 serial_cfg new_conf = {0};
@@ -512,6 +525,19 @@ tui_endpoint() {
                     return;
                 }
                 // serial config is bad, just continue with this window
+                // Note: have to redraw after writing in log
+                box(win, 0, 0);
+                mvwprintw(win, 0, 1, "Serial Endpoint");
+                mvwprintw(win, 1, 1, "Device:    ");
+                mvwprintw(win, 2, 1, "Baudrate:  ");
+                mvwprintw(win, 3, 1, "Data bits: ");
+                mvwprintw(win, 4, 1, "Stop bits: ");
+                mvwprintw(win, 5, 1, "Parity:    ");
+
+                mvwprintw(win, 8, 1, "F1 - Submit");
+                mvwprintw(win, 9, 1, "F2 - Cancel");
+                wrefresh(win);
+                pos_form_cursor(form);
                 break;
             }
 
@@ -591,6 +617,19 @@ tui_uid() {
                 pglobals->slave_id_end   = end;
                 close_dialog(win, form, field, nfields);
                 return;
+            } else {
+                // Note: have to redraw after writing in log
+                box(win, 0, 0);
+                mvwprintw(win, 0, 1, "Unit ID");
+                mvwprintw(win, 1, 1, "UID Start: ");
+                mvwprintw(win, 2, 1, "UID End:   ");
+                // mvwprintw(win, 7, 1, "Status ok");
+                mvwprintw(win, 4, 1, "F1 - Submit");
+                mvwprintw(win, 5, 1, "F2 - Cancel");
+                wrefresh(win);
+                pos_form_cursor(form);
+
+                break;
             }
             break;
         }
@@ -737,7 +776,7 @@ tui_qty_addr() {
         case KEY_F(1): {
             // make sure all buffer available and valid
             if (form_driver(form, REQ_VALIDATION) != E_OK) {
-                break;
+                continue;
             }
 
             char *fb1 = field_buffer(field[0], 0);
@@ -756,6 +795,20 @@ tui_qty_addr() {
                 pglobals->cxt.wcount   = wcount;
                 close_dialog(win, form, field, nfields);
                 return;
+            } else {
+                // Note: have to redraw after writing in log
+                box(win, 0, 0);
+                mvwprintw(win, 0, 1, "Qanity and Addresses");
+                mvwprintw(win, 1, 1, "Read  address: ");
+                mvwprintw(win, 2, 1, "Read  count:   ");
+                mvwprintw(win, 3, 1, "Write address: ");
+                mvwprintw(win, 4, 1, "Write count:   ");
+                mvwprintw(win, 6, 1, "F1 - Submit");
+                mvwprintw(win, 7, 1, "F2 - Cancel");
+                wrefresh(win);
+                pos_form_cursor(form);
+
+                break;
             }
             break;
         }
@@ -917,7 +970,7 @@ tui_wdata() {
                 close_dialog(win, form, field, nfields);
                 return;
             }
-            break;
+            continue;
         }
 
         default: form_driver(form, ch); break;
