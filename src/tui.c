@@ -217,14 +217,14 @@ init_tui(global_t *globals) {
 
     // init header
     int header_bottom = 16;
-    wheader           = newwin(header_bottom, COLS, 0, 0);
+    wheader           = NEW_WIN(header_bottom, COLS, 0, 0);
     redraw_header();
 
     // init logd
     int rows      = LINES - header_bottom;
     logd.max_rows = rows;
     logd.linel    = COLS;
-    wlog          = newwin(rows, COLS, header_bottom, 0);
+    wlog          = NEW_WIN(rows, COLS, header_bottom, 0);
     box(wlog, 0, 0);
     redraw_log();
 }
@@ -397,17 +397,17 @@ tui_endpoint() {
     const u8 win_height = 11;
 
     //                   h           w                      y              x
-    WINDOW *win = newwin(win_height, win_width, LINES / 2 - 5, COLS / 2 - 16);
+    WINDOW *win = NEW_WIN(win_height, win_width, LINES / 2 - 5, COLS / 2 - 16);
     keypad(win, TRUE);
 
     if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
         nfields  = 2;
         // host field
-        field[0] = new_field(1, input_field_lane, 0, 0, 0, 0);
+        field[0] = NEW_FIELD(1, input_field_lane, 0, 0);
         set_field_back(field[0], A_UNDERLINE);
         set_field_buffer(field[0], 0, pglobals->tcp_endp.host);
         // port field
-        field[1] = new_field(1, input_field_lane, 1, 0, 0, 0);
+        field[1] = NEW_FIELD(1, input_field_lane, 1, 0);
         set_field_back(field[1], A_UNDERLINE);
         set_field_type(field[1], TYPE_INTEGER, 0, 0, 65535);
         char buff[16] = {0};
@@ -417,7 +417,7 @@ tui_endpoint() {
         field[2] = NULL;
     } else {
         for (u8 i = 0; i < nfields; i++) {
-            field[i] = new_field(1, input_field_lane, i, 0, 0, 0);
+            field[i] = NEW_FIELD(1, input_field_lane, i, 0);
         }
         // device field
         set_field_back(field[0], A_UNDERLINE);
@@ -440,7 +440,7 @@ tui_endpoint() {
 
     form = new_form(field);
     set_form_win(form, win); //    h  w                 y  x
-    set_form_sub(form, derwin(win, 5, input_field_lane, 1, legend_len));
+    set_form_sub(form, DERWIN(win, 5, input_field_lane, 1, legend_len));
     post_form(form);
 
     // TODO: TMP
@@ -529,18 +529,18 @@ tui_uid() {
     u8     nfields = 2; // Magic number but fine; it's maximum filed for both Serial and TCP
 
     //                   h  w  y              x
-    WINDOW *win = newwin(7, 32, LINES / 2 - 5, COLS / 2 - 16);
+    WINDOW *win = NEW_WIN(7, 32, LINES / 2 - 5, COLS / 2 - 16);
     keypad(win, TRUE);
 
     // end field
-    field[0] = new_field(1, 14, 0, 0, 0, 0);
+    field[0] = NEW_FIELD(1, 14, 0, 0);
     set_field_back(field[0], A_UNDERLINE);
     set_field_type(field[0], TYPE_INTEGER, 0, 0, 255);
     char buff[16] = {0};
     snprintf(buff, 16, "%d", pglobals->slave_id_start);
     set_field_buffer(field[0], 0, buff);
     // end field
-    field[1] = new_field(1, 14, 1, 0, 0, 0);
+    field[1] = NEW_FIELD(1, 14, 1, 0);
     set_field_back(field[1], A_UNDERLINE);
     set_field_type(field[1], TYPE_INTEGER, 0, 0, 255);
     memset(buff, 0, 16);
@@ -551,7 +551,7 @@ tui_uid() {
 
     form = new_form(field);
     set_form_win(form, win); //    h  w   y  x
-    set_form_sub(form, derwin(win, 5, 16, 1, 13));
+    set_form_sub(form, DERWIN(win, 5, 16, 1, 13));
     post_form(form);
 
     box(win, 0, 0);
@@ -622,8 +622,8 @@ ind_to_fc(int ind) {
 
 void
 tui_fc() {
-    //                   h   w   y              x
-    WINDOW *wfc = newwin(13, 48, LINES / 2 - 7, COLS / 2 - 24);
+    //                    h   w   y              x
+    WINDOW *wfc = NEW_WIN(13, 48, LINES / 2 - 7, COLS / 2 - 24);
     // YEAH! MAGIC AROUND!
     keypad(wfc, TRUE);
     box(wfc, 0, 0);
@@ -670,11 +670,11 @@ tui_qty_addr() {
     u8     nfields = 4; // Magic number but fine; it's maximum filed for both Serial and TCP
 
     //                   h   w   y              x
-    WINDOW *win = newwin(9, 26, LINES / 2 - 5, COLS / 2 - 16);
+    WINDOW *win = NEW_WIN(9, 26, LINES / 2 - 5, COLS / 2 - 16);
     keypad(win, TRUE);
 
     for (int i = 0; i < nfields; i++) {
-        field[i] = new_field(1, 6, i, 0, 0, 0);
+        field[i] = NEW_FIELD(1, 6, i, 0);
         set_field_back(field[i], A_UNDERLINE);
     }
 
@@ -705,8 +705,8 @@ tui_qty_addr() {
     field[4] = NULL;
 
     form = new_form(field);
-    set_form_win(form, win); //    h  w   y  x
-    set_form_sub(form, derwin(win, 5, 6, 1, 18));
+    set_form_win(form, win); //    h  w  y  x
+    set_form_sub(form, DERWIN(win, 5, 6, 1, 18));
     post_form(form);
 
     box(win, 0, 0);
@@ -774,18 +774,18 @@ tui_timeouts(global_t *pglobals) {
     u8     nfields = 2; // Magic number but fine; it's maximum filed for both Serial and TCP
 
     //                   h   w   y              x
-    WINDOW *win = newwin(7, 27, LINES / 2 - 5, COLS / 2 - 16);
+    WINDOW *win = NEW_WIN(7, 27, LINES / 2 - 5, COLS / 2 - 16);
     keypad(win, TRUE);
 
     // response timeout field
-    field[0] = new_field(1, 6, 0, 0, 0, 0);
+    field[0] = NEW_FIELD(1, 6, 0, 0);
     set_field_back(field[0], A_UNDERLINE);
     set_field_type(field[0], TYPE_INTEGER, 0, 0, 10000);
     char buff[16] = {0};
     snprintf(buff, 16, "%d", pglobals->response_timeout);
     set_field_buffer(field[0], 0, buff);
     // send timeout field
-    field[1] = new_field(1, 6, 1, 0, 0, 0);
+    field[1] = NEW_FIELD(1, 6, 1, 0);
     set_field_back(field[1], A_UNDERLINE);
     set_field_type(field[1], TYPE_INTEGER, 0, 0, 10000);
     memset(buff, 0, 16);
@@ -795,8 +795,8 @@ tui_timeouts(global_t *pglobals) {
     field[2] = NULL;
 
     form = new_form(field);
-    set_form_win(form, win); //    h  w   y  x
-    set_form_sub(form, derwin(win, 5, 6, 1, 19));
+    set_form_win(form, win); //    h  w  y  x
+    set_form_sub(form, DERWIN(win, 5, 6, 1, 19));
     post_form(form);
 
     box(win, 0, 0);
@@ -868,11 +868,11 @@ tui_wdata() {
     const u8 current_reg_count = CLAMP(pglobals->cxt.wcount, 0, WD_MAX_LEN);
 
     //                   h           w          y                           x
-    WINDOW *win = newwin(win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2);
+    WINDOW *win = NEW_WIN(win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2);
     keypad(win, TRUE);
 
     // response timeout field
-    field[0] = new_field(nlines, input_line_len, 0, 0, 0, 0);
+    field[0] = NEW_FIELD(nlines, input_line_len, 0, 0);
     set_field_back(field[0], A_UNDERLINE);
 
     // write data to buffer
@@ -889,7 +889,7 @@ tui_wdata() {
 
     form = new_form(field);
     set_form_win(form, win); //    h       w               y  x
-    set_form_sub(form, derwin(win, nlines, input_line_len, 1, 8));
+    set_form_sub(form, DERWIN(win, nlines, input_line_len, 1, 8));
     post_form(form);
 
     box(win, 0, 0);
