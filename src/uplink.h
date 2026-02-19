@@ -3,9 +3,7 @@
 
 #include "client_cxt.h"
 
-int
-open_uplink(global_t *global);
-int
-relink(global_t *global);
+int open_uplink(global_t *global);
+int relink(global_t *global);
 
 #endif

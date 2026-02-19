@@ -60,7 +60,6 @@ typedef struct global {
     u64 time_start;
 } global_t;
 
-int
-init_client(int argc, char **argv, global_t *global);
+int init_client(int argc, char **argv, global_t *global);
 
 #endif

@@ -226,7 +226,7 @@ handle_startup_args(int argc, char **argv, global_t *global) {
             break;
 
         case 'h': help(""); return RC_FAIL;
-        default : help(""); return RC_FAIL;
+        default: help(""); return RC_FAIL;
         }
     }
 

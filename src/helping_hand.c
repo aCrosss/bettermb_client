@@ -322,12 +322,12 @@ int
 fc_flags(int function_code) {
     switch (function_code) {
     case MB_FC_READ_COILS:
-    case MB_FC_READ_DISCRETE_INPUTS    : return FCF_READ | FCF_BITS;
-    case MB_FC_READ_HOLDING_REGISTERS  :
-    case MB_FC_READ_INPUT_REGISTERS    : return FCF_READ;
-    case MB_FC_WRITE_SINGLE_COIL       : return FCF_WRITE | FCF_BITS;
-    case MB_FC_WRITE_SINGLE_REGISTER   : return FCF_WRITE;
-    case MB_FC_WRITE_MULTIPLE_COILS    : return FCF_WRITE | FCF_BITS;
+    case MB_FC_READ_DISCRETE_INPUTS: return FCF_READ | FCF_BITS;
+    case MB_FC_READ_HOLDING_REGISTERS:
+    case MB_FC_READ_INPUT_REGISTERS: return FCF_READ;
+    case MB_FC_WRITE_SINGLE_COIL: return FCF_WRITE | FCF_BITS;
+    case MB_FC_WRITE_SINGLE_REGISTER: return FCF_WRITE;
+    case MB_FC_WRITE_MULTIPLE_COILS: return FCF_WRITE | FCF_BITS;
     case MB_FC_WRITE_MULTIPLE_REGISTERS: return FCF_WRITE;
     case MB_FC_WRITE_AND_READ_REGISTERS: return FCF_WRITE | FCF_READ;
     }

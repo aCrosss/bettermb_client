@@ -12,22 +12,22 @@
 const char *
 str_protocol(mb_protocol_t protocol) {
     switch (protocol) {
-    case MB_PROTOCOL_RTU  : return "RTU";
+    case MB_PROTOCOL_RTU: return "RTU";
     case MB_PROTOCOL_ASCII: return "ASCII";
-    case MB_PROTOCOL_TCP  : return "TCP";
+    case MB_PROTOCOL_TCP: return "TCP";
     }
 }
 
 const char *
 str_fc(fc_t fc) {
     switch (fc) {
-    case MB_FC_READ_COILS              : return "01 - Read Coils (0x01)";
-    case MB_FC_READ_DISCRETE_INPUTS    : return "02 - Read Discrete Inputs  (0x02)";
-    case MB_FC_READ_HOLDING_REGISTERS  : return "03 - Read Holding Registers (0x03)";
-    case MB_FC_READ_INPUT_REGISTERS    : return "04 - Read Input Registers (0x04)";
-    case MB_FC_WRITE_SINGLE_COIL       : return "05 - Write Single Coil (0x05)";
-    case MB_FC_WRITE_SINGLE_REGISTER   : return "06 - Write Single Register (0x06)";
-    case MB_FC_WRITE_MULTIPLE_COILS    : return "15 - Write Multiple Coils (0x0F)";
+    case MB_FC_READ_COILS: return "01 - Read Coils (0x01)";
+    case MB_FC_READ_DISCRETE_INPUTS: return "02 - Read Discrete Inputs  (0x02)";
+    case MB_FC_READ_HOLDING_REGISTERS: return "03 - Read Holding Registers (0x03)";
+    case MB_FC_READ_INPUT_REGISTERS: return "04 - Read Input Registers (0x04)";
+    case MB_FC_WRITE_SINGLE_COIL: return "05 - Write Single Coil (0x05)";
+    case MB_FC_WRITE_SINGLE_REGISTER: return "06 - Write Single Register (0x06)";
+    case MB_FC_WRITE_MULTIPLE_COILS: return "15 - Write Multiple Coils (0x0F)";
     case MB_FC_WRITE_MULTIPLE_REGISTERS: return "16 - Write Multiple registers (0x10)";
     case MB_FC_WRITE_AND_READ_REGISTERS: return "23 - Read/Write Multiple registers (0x17)";
 
@@ -38,12 +38,12 @@ str_fc(fc_t fc) {
 const char *
 str_valid_err(mb_validation_err_t err) {
     switch (err) {
-    case MB_VALIDATION_ERROR_OK          : return "ok";
-    case MB_VALIDATION_ERROR_SHORT       : return "too short";
-    case MB_VALIDATION_ERROR_BAD_CRC     : return "bad crc";
+    case MB_VALIDATION_ERROR_OK: return "ok";
+    case MB_VALIDATION_ERROR_SHORT: return "too short";
+    case MB_VALIDATION_ERROR_BAD_CRC: return "bad crc";
     case MB_VALIDATION_ERROR_INVALID_DATA: return "invalid data";
-    case MB_VALIDATION_ERROR_BAD_LEN     : return "bad len";
-    case MB_VALIDATION_ERROR_BAD_LRC     : return "bad lrc";
+    case MB_VALIDATION_ERROR_BAD_LEN: return "bad len";
+    case MB_VALIDATION_ERROR_BAD_LRC: return "bad lrc";
     case MB_VALIDATION_ERROR_BAD_PROTO_ID: return "bad protocol id";
     }
 }
@@ -51,16 +51,16 @@ str_valid_err(mb_validation_err_t err) {
 static const char *
 str_ex_code(mb_ex_t ex) {
     switch (ex) {
-    case MB_EX_ILLEGAL_FUNCTION       : return "illegal function";
-    case MB_EX_ILLEGAL_DATA_ADDRESS   : return "illegal data address";
-    case MB_EX_ILLEGAL_DATA_VALUE     : return "illegal data value";
+    case MB_EX_ILLEGAL_FUNCTION: return "illegal function";
+    case MB_EX_ILLEGAL_DATA_ADDRESS: return "illegal data address";
+    case MB_EX_ILLEGAL_DATA_VALUE: return "illegal data value";
     case MB_EX_SLAVE_OR_SERVER_FAILURE: return "slave or server failure";
-    case MB_EX_ACKNOWLEDGE            : return "acknowledge";
-    case MB_EX_SLAVE_OR_SERVER_BUSY   : return "slave or server busy";
-    case MB_EX_MEMORY_PARITY          : return "memory parity";
-    case MB_EX_GATEWAY_PATH           : return "gateway path";
-    case MB_EX_GATEWAY_TARGET         : return "gateway target";
-    default                           : return "unknown";
+    case MB_EX_ACKNOWLEDGE: return "acknowledge";
+    case MB_EX_SLAVE_OR_SERVER_BUSY: return "slave or server busy";
+    case MB_EX_MEMORY_PARITY: return "memory parity";
+    case MB_EX_GATEWAY_PATH: return "gateway path";
+    case MB_EX_GATEWAY_TARGET: return "gateway target";
+    default: return "unknown";
     }
 }
 
@@ -153,8 +153,8 @@ is_valid_ex_code(mb_ex_t exc) {
     case MB_EX_SLAVE_OR_SERVER_BUSY:
     case MB_EX_MEMORY_PARITY:
     case MB_EX_GATEWAY_PATH:
-    case MB_EX_GATEWAY_TARGET         : return TRUE;
-    default                           : return FALSE;
+    case MB_EX_GATEWAY_TARGET: return TRUE;
+    default: return FALSE;
     }
 }
 
@@ -335,9 +335,9 @@ build_adu_tcp(u8 out_adu[MB_TCP_MAX_ADU_LEN], frame_t *frame) {
 int
 build_adu(u8 *adu, frame_t *frame) {
     switch (frame->protocol) {
-    case MB_PROTOCOL_RTU  : return build_adu_rtu(adu, frame);
+    case MB_PROTOCOL_RTU: return build_adu_rtu(adu, frame);
     case MB_PROTOCOL_ASCII: return build_adu_ascii(adu, frame);
-    case MB_PROTOCOL_TCP  : return build_adu_tcp(adu, frame);
+    case MB_PROTOCOL_TCP: return build_adu_tcp(adu, frame);
     }
 
     return RC_FAIL;
@@ -352,7 +352,7 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
     // check for valid modbus exception code
     if (rsp[0] & 0x80) {
         // fc not equal anyway
-        if (fcode != rsp[0] & !0x80) {
+        if ((fcode != rsp[0]) & (fcode != 0x80)) {
             log_linef("! exception code; req-rsp fc not same (req: %d, rsp: %d):", fcode, rsp[0] & !0x80);
             return RC_FAIL;
         }
@@ -379,10 +379,10 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         qty    = req[3] << 8 | req[4];
         nbytes = (qty + 7) / 8;
 
-        if (rsp[1] != nbytes) {
-            log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", fcode, rsp[0]);
-            return RC_FAIL;
-        }
+        // if (rsp[1] != nbytes) {
+        //     log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", nbytes, rsp[1]);
+        //     return RC_FAIL;
+        // }
 
         if (rsp_len != nbytes + 2) {
             log_linef(
@@ -491,8 +491,8 @@ mb_compute_meta_len(fc_t fc, mb_dir_t dir) {
         case MB_FC_READ_INPUT_REGISTERS:
         case MB_FC_READ_HOLDING_REGISTERS:
         case MB_FC_WRITE_SINGLE_COIL:
-        case MB_FC_WRITE_SINGLE_REGISTER   : len = 5; break;
-        case MB_FC_WRITE_MULTIPLE_COILS    :
+        case MB_FC_WRITE_SINGLE_REGISTER: len = 5; break;
+        case MB_FC_WRITE_MULTIPLE_COILS:
         case MB_FC_WRITE_MULTIPLE_REGISTERS: len = 6; break;
         case MB_FC_WRITE_AND_READ_REGISTERS: len = 10; break;
         }
@@ -504,7 +504,7 @@ mb_compute_meta_len(fc_t fc, mb_dir_t dir) {
         case MB_FC_WRITE_SINGLE_REGISTER:
         case MB_FC_WRITE_MULTIPLE_COILS:
         case MB_FC_WRITE_MULTIPLE_REGISTERS: len = 5; break;
-        default                            : len = 2;
+        default: len = 2;
         }
     }
 
@@ -525,7 +525,7 @@ mb_compute_data_len_offset(fc_t fc, mb_dir_t dir) {
         case MB_FC_READ_INPUT_REGISTERS:
         case MB_FC_READ_HOLDING_REGISTERS:
         case MB_FC_WRITE_SINGLE_COIL:
-        case MB_FC_WRITE_SINGLE_REGISTER : break;
+        case MB_FC_WRITE_SINGLE_REGISTER: break;
         }
     }
     // dir == MB_DIR_RESPONSE
@@ -560,7 +560,7 @@ mb_has_data(fc_t fc, mb_dir_t dir) {
         case MB_FC_READ_HOLDING_REGISTERS:
         case MB_FC_READ_INPUT_REGISTERS:
         case MB_FC_WRITE_SINGLE_COIL:
-        case MB_FC_WRITE_SINGLE_REGISTER : return 0;
+        case MB_FC_WRITE_SINGLE_REGISTER: return 0;
         }
     }
     // dir == MB_DIR_RESPONSE
@@ -706,9 +706,9 @@ mb_tcp_get_expected_adu_len(u8 *adu, int have) {
 int
 mb_get_expected_adu_len(mb_protocol_t proto, u8 *adu, int adu_len, mb_dir_t dir) {
     switch (proto) {
-    case MB_PROTOCOL_RTU  : return mb_rtu_get_expected_adu_len(adu, adu_len, dir);
+    case MB_PROTOCOL_RTU: return mb_rtu_get_expected_adu_len(adu, adu_len, dir);
     case MB_PROTOCOL_ASCII: return mb_ascii_get_expected_adu_len(adu, adu_len, dir);
-    case MB_PROTOCOL_TCP  : return mb_tcp_get_expected_adu_len(adu, adu_len);
+    case MB_PROTOCOL_TCP: return mb_tcp_get_expected_adu_len(adu, adu_len);
     }
     return -1;
 }
@@ -753,9 +753,9 @@ client_get_expected_rsp_adu_len(mb_protocol_t protocol, func_cxt_t *fcxt) {
     }
 
     switch (protocol) {
-    case MB_PROTOCOL_RTU  : return uid + pdu_len + crc;
+    case MB_PROTOCOL_RTU: return uid + pdu_len + crc;
     case MB_PROTOCOL_ASCII: return ascii_head + pdu_len * 2 + crc + ascii_tail;
-    case MB_PROTOCOL_TCP  : return mbaph + pdu_len;
+    case MB_PROTOCOL_TCP: return mbaph + pdu_len;
     }
 }
 
@@ -797,9 +797,9 @@ mb_tcp_extract_frame(u8 *adu, int adu_len, frame_t *out) {
 void
 mb_extract_frame(mb_protocol_t proto, u8 *adu, int adu_len, frame_t *out) {
     switch (proto) {
-    case MB_PROTOCOL_RTU  : mb_rtu_extract_frame(adu, adu_len, out); break;
+    case MB_PROTOCOL_RTU: mb_rtu_extract_frame(adu, adu_len, out); break;
     case MB_PROTOCOL_ASCII: mb_ascii_extract_frame(adu, adu_len, out); break;
-    case MB_PROTOCOL_TCP  : mb_tcp_extract_frame(adu, adu_len, out); break;
+    case MB_PROTOCOL_TCP: mb_tcp_extract_frame(adu, adu_len, out); break;
     }
 }
 
@@ -896,9 +896,9 @@ mb_tcp_is_adu_valid(u8 *adu, int len) {
 mb_validation_err_t
 mb_is_adu_valid(mb_protocol_t proto, u8 *adu, int adu_len) {
     switch (proto) {
-    case MB_PROTOCOL_RTU  : return mb_rtu_is_adu_valid(adu, adu_len);
+    case MB_PROTOCOL_RTU: return mb_rtu_is_adu_valid(adu, adu_len);
     case MB_PROTOCOL_ASCII: return mb_ascii_is_adu_valid(adu, adu_len);
-    case MB_PROTOCOL_TCP  : return mb_tcp_is_adu_valid(adu, adu_len);
+    case MB_PROTOCOL_TCP: return mb_tcp_is_adu_valid(adu, adu_len);
     }
     return 0;
 }

@@ -19,26 +19,28 @@ global_t       *pglobals;
 
 const char *
 str_baud(int baudrare) {
+    // clang-format off
     switch (baudrare) {
-    case 0     : return "0";
-    case 50    : return "50";
-    case 75    : return "75";
-    case 110   : return "110";
-    case 134   : return "134";
-    case 150   : return "150";
-    case 200   : return "200";
-    case 300   : return "300";
-    case 600   : return "600";
-    case 1200  : return "1200";
-    case 1800  : return "1800";
-    case 2400  : return "2400";
-    case 4800  : return "4800";
-    case 9600  : return "9600";
-    case 19200 : return "19200";
-    case 38400 : return "38400";
+    case 0:      return "0";
+    case 50:     return "50";
+    case 75:     return "75";
+    case 110:    return "110";
+    case 134:    return "134";
+    case 150:    return "150";
+    case 200:    return "200";
+    case 300:    return "300";
+    case 600:    return "600";
+    case 1200:   return "1200";
+    case 1800:   return "1800";
+    case 2400:   return "2400";
+    case 4800:   return "4800";
+    case 9600:   return "9600";
+    case 19200:  return "19200";
+    case 38400:  return "38400";
     case 115200: return "115200";
-    default    : return "19200";
+    default:     return "19200";
     }
+    // clang-format on
 
     return "19200";
 }
@@ -88,12 +90,14 @@ log_t logd = {0};
 
 static const char *
 str_dirstat(dirstat_t ds) {
+    // clang-format off
     switch (ds) {
-    case DS_IN_OK   : return "->";
-    case DS_IN_FAIL : return "x>";
-    case DS_OUT_OK  : return "<-";
+    case DS_IN_OK:    return "->";
+    case DS_IN_FAIL:  return "x>";
+    case DS_OUT_OK:   return "<-";
     case DS_OUT_FAIL: return "<x";
     }
+    // clang-format on
 }
 
 void
@@ -465,12 +469,14 @@ tui_endpoint() {
     while (1) {
         int ch = wgetch(win);
 
+        // clang-format off
         switch (ch) {
         case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
         case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
         case KEY_LEFT     : form_driver(form, REQ_PREV_CHOICE); break;
         case KEY_RIGHT    : form_driver(form, REQ_NEXT_CHOICE); break;
         case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        // clang-format on
 
         // cancel
         case KEY_F(2): close_dialog(win, form, field, nfields); return;
@@ -561,10 +567,12 @@ tui_uid() {
     while (1) {
         int ch = wgetch(win);
 
+        // clang-format off
         switch (ch) {
         case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
         case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
         case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        // clang-format on
 
         // cancel
         case KEY_F(2): close_dialog(win, form, field, nfields); return;
@@ -715,10 +723,12 @@ tui_qty_addr() {
     while (1) {
         int ch = wgetch(win);
 
+        // clang-format off
         switch (ch) {
         case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
         case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
-        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV);   break;
+        // clang-format on
 
         // cancel
         case KEY_F(2): close_dialog(win, form, field, nfields); return;
@@ -802,10 +812,12 @@ tui_timeouts(global_t *pglobals) {
     while (1) {
         int ch = wgetch(win);
 
+        // clang-format off
         switch (ch) {
         case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
         case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
         case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        // clang-format on
 
         // cancel
         case KEY_F(2): close_dialog(win, form, field, nfields); return;
