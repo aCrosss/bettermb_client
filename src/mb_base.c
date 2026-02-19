@@ -752,10 +752,10 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         qty    = req[3] << 8 | req[4];
         nbytes = (qty + 7) / 8;
 
-        // if (rsp[1] != nbytes) {
-        //     log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", nbytes, rsp[1]);
-        //     return RC_FAIL;
-        // }
+        if (rsp[1] != nbytes) {
+            log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", nbytes, rsp[1]);
+            return RC_FAIL;
+        }
 
         if (rsp_len != nbytes + 2) {
             log_linef(
