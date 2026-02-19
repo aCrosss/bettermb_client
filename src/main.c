@@ -265,6 +265,9 @@ main(int argc, char *argv[]) {
                 redraw_header();
                 continue;
             }
+
+            // wait small ammount of time to let new connection get ready
+            msleep(10);
         }
 
         // make sure we run request on according connection
