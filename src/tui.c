@@ -172,6 +172,9 @@ redraw_header() {
     mvwprintw(wheader, 1, col_2, "F5 | Running: %s", pglobals->running ? "On" : "Off");
     mvwprintw(wheader, 2, col_2, "F6 | Random:  %s", pglobals->random ? "On" : "Off");
 
+    mvwprintw(wheader, 4, col_2, "F7 | Fire request sequence:");
+    mvwprintw(wheader, 5, col_2, "     %06d / %06d", pglobals->rfire_current, pglobals->rfire_count);
+
     mvwprintw(wheader, 7, col_2, "F9 | Response timeout: %d ms", pglobals->response_timeout);
     mvwprintw(wheader, 8, col_2, "   | Send timeout    : %d ms", pglobals->timeout);
 

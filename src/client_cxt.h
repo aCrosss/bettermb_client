@@ -59,6 +59,9 @@ typedef struct global {
     int timeout; // ms
     int random;
 
+    u32 rfire_count;   // requests ordered to fire in sequence
+    u32 rfire_current; // current request in fire sequence
+
     u64 time_start;
 } global_t;
 

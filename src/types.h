@@ -15,6 +15,8 @@
 #define u32 unsigned int
 #define u64 unsigned long
 
+#define MAX_R_FIREED 999999 // how much requset we can order to fire in sequence
+
 // -------- macroses --------------------------------------------------------------------
 
 #define FLAG(n)          (1 << (n))
