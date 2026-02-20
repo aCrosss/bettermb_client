@@ -4,6 +4,9 @@
 
 #include "client_cxt.h"
 #include "types.h"
+
+#define PERCENT(v, max) ((float)v / max * 100)
+
 // clang-format on
 
 char nibble_to_hex(u8 d);

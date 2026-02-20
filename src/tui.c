@@ -140,6 +140,11 @@ print_wdata() {
 
 void
 redraw_header() {
+    // y positions of tui header columns
+    const int col_1 = 1;
+    const int col_2 = 58;
+    const int col_3 = 92;
+
     pthread_mutex_lock(&mutex);
 
     wclear(wheader);
@@ -148,43 +153,45 @@ redraw_header() {
     s8 endp[32];
     str_curr_endpoint(endp, pglobals);
 
-    mvwprintw(wheader, 1, 1, "1 | Protocol: %s", str_protocol(pglobals->cxt.protocol));
-    mvwprintw(wheader, 2, 1, "2 | Endpoint: %s", endp);
+    mvwprintw(wheader, 1, col_1, "1 | Protocol: %s", str_protocol(pglobals->cxt.protocol));
+    mvwprintw(wheader, 2, col_1, "2 | Endpoint: %s", endp);
     if (pglobals->slave_id_start == pglobals->slave_id_end) {
-        mvwprintw(wheader, 3, 1, "3 | Unit IDs: %d", pglobals->slave_id_start);
+        mvwprintw(wheader, 3, col_1, "3 | Unit IDs: %d", pglobals->slave_id_start);
     } else {
-        mvwprintw(wheader, 3, 1, "3 | Unit IDs: %d-%d", pglobals->slave_id_start, pglobals->slave_id_end);
+        mvwprintw(wheader, 3, col_1, "3 | Unit IDs: %d-%d", pglobals->slave_id_start, pglobals->slave_id_end);
     }
-    mvwprintw(wheader, 4, 1, "4 | Function: %s", str_fc(pglobals->cxt.fc));
+    mvwprintw(wheader, 4, col_1, "4 | Function: %s", str_fc(pglobals->cxt.fc));
 
-    mvwprintw(wheader, 6, 1, "5 | Read address : 0x%04X", pglobals->cxt.raddress);
-    mvwprintw(wheader, 7, 1, "  | Read count   : %d", pglobals->cxt.rcount);
-    mvwprintw(wheader, 8, 1, "  | Write address: 0x%04X", pglobals->cxt.waddress);
-    mvwprintw(wheader, 9, 1, "  | Write count  : %d", pglobals->cxt.wcount);
-    mvwprintw(wheader, 10, 1, "6 | Write Data   : ");
+    mvwprintw(wheader, 6, col_1, "5 | Read address : 0x%04X", pglobals->cxt.raddress);
+    mvwprintw(wheader, 7, col_1, "  | Read count   : %d", pglobals->cxt.rcount);
+    mvwprintw(wheader, 8, col_1, "  | Write address: 0x%04X", pglobals->cxt.waddress);
+    mvwprintw(wheader, 9, col_1, "  | Write count  : %d", pglobals->cxt.wcount);
+    mvwprintw(wheader, 10, col_1, "6 | Write Data   : ");
     print_wdata(pglobals);
 
-    mvwprintw(wheader, 1, 64, "F5 | Running: %s", pglobals->running ? "On" : "Off");
-    mvwprintw(wheader, 2, 64, "F6 | Random:  %s", pglobals->random ? "On" : "Off");
-    mvwprintw(wheader, 4, 64, "F8 | Reset statistics");
+    mvwprintw(wheader, 1, col_2, "F5 | Running: %s", pglobals->running ? "On" : "Off");
+    mvwprintw(wheader, 2, col_2, "F6 | Random:  %s", pglobals->random ? "On" : "Off");
 
-    mvwprintw(wheader, 6, 64, "F9 | Response timeout: %d ms", pglobals->response_timeout);
-    mvwprintw(wheader, 7, 64, "   | Send timeout    : %d ms", pglobals->timeout);
+    mvwprintw(wheader, 7, col_2, "F9 | Response timeout: %d ms", pglobals->response_timeout);
+    mvwprintw(wheader, 8, col_2, "   | Send timeout    : %d ms", pglobals->timeout);
 
     int reqs      = pglobals->stats.requests;
     int successes = pglobals->stats.success;
     int fails     = pglobals->stats.fails;
     int timeouts  = pglobals->stats.timeouts;
-    mvwprintw(wheader, 1, 96, "Requests:  %04d", reqs);
+
+    mvwprintw(wheader, 1, col_3, "Requests:  %05d", reqs);
 
     // won't affect real statistic output, but make crude 0 div safeguard
     if (!reqs) {
         reqs = 1;
     }
 
-    mvwprintw(wheader, 2, 96, "Successed: %04d  %.2f%%", successes, (float)successes / reqs * 100);
-    mvwprintw(wheader, 3, 96, "Failed:    %04d  %.2f%%", fails, (float)fails / reqs * 100);
-    mvwprintw(wheader, 4, 96, "Timedout:  %04d  %.2f%%", timeouts, (float)timeouts / reqs * 100);
+    mvwprintw(wheader, 2, col_3, "Successed: %05d  %.2f%%", successes, (float)successes / reqs * 100);
+    mvwprintw(wheader, 3, col_3, "Failed:    %05d  %.2f%%", fails, (float)fails / reqs * 100);
+    mvwprintw(wheader, 4, col_3, "Timedout:  %05d  %.2f%%", timeouts, (float)timeouts / reqs * 100);
+
+    mvwprintw(wheader, 6, col_3, "F8 | Reset statistics");
 
     wrefresh(wheader);
     pthread_mutex_unlock(&mutex);
@@ -216,15 +223,14 @@ init_tui(global_t *globals) {
     refresh();
 
     // init header
-    int header_bottom = 16;
-    wheader           = NEW_WIN(header_bottom, COLS, 0, 0);
+    wheader = NEW_WIN(HEADER_BOTTOM, COLS, 0, 0);
     redraw_header();
 
     // init logd
-    int rows      = LINES - header_bottom;
+    int rows      = LINES - HEADER_BOTTOM;
     logd.max_rows = rows;
     logd.linel    = COLS;
-    wlog          = NEW_WIN(rows, COLS, header_bottom, 0);
+    wlog          = NEW_WIN(rows, COLS, HEADER_BOTTOM, 0);
     box(wlog, 0, 0);
     redraw_log();
 }
@@ -1055,6 +1061,39 @@ input_thread() {
     while (1) {
         int key = getch();
         if (key == ERR) {
+            continue;
+        }
+
+        // handle terminal resize, redraw everething
+        if (key == KEY_RESIZE) {
+            resize_term(0, 0);
+            clear();
+
+            // print warning if terminal is too small
+            if (COLS < 116 || LINES < 22) {
+                log_linef("! it's not recommended to run BMB CLient in terminal less than 116x22 in size");
+            }
+
+            clearok(curscr, TRUE);
+            refresh();
+
+            // resize and redraw header
+            wresize(wheader, HEADER_BOTTOM, COLS);
+            redraw_header(pglobals);
+
+            // restructure log, drop older lines if they doesn't fit in new line count
+            logd.max_rows = LINES - HEADER_BOTTOM;
+            if (logd.linec >= logd.max_rows) {
+                for (int i = 0; i < logd.max_rows; i++) {
+                    strncpy(logd.lines[i], logd.lines[i + 1], MAX_LINE_LEN);
+                }
+                logd.linec--;
+            }
+
+            // resize and redraw header
+            wresize(wlog, LINES - HEADER_BOTTOM, COLS);
+            redraw_log(pglobals);
+
             continue;
         }
 

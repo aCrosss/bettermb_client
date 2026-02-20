@@ -6,7 +6,8 @@
 
 #include "client_cxt.h"
 
-// newwin(win_height, win_width, LINES / 2 - 5, COLS / 2 - 16);
+#define HEADER_BOTTOM 16 // header bottom position in y coords
+
 #define NEW_WIN(h, w, y, x)     (newwin(h, w, y, x))
 #define NEW_FIELD(h, w, y, x)   (new_field(h, w, y, x, 0, 0))
 #define DERWIN(win, h, w, y, x) (derwin(win, h, w, y, x))
