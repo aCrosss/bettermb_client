@@ -405,7 +405,6 @@ tui_endpoint() {
     TUIDW_HEAD(5, win_height, win_width, LINES / 2 - 5, COLS / 2 - 16)
 
     if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
-        nfields  = 2;
         // host field
         field[0] = NEW_FIELD(1, input_field_lane, 0, 0);
         set_field_back(field[0], A_UNDERLINE);
@@ -992,6 +991,70 @@ tui_wdata() {
     }
 }
 
+// ---------------------------- Fire sequence ----------------------------------
+
+void
+tui_fsequence() {
+    //   nfields  h  w   y              x
+    TUIDW_HEAD(1, 7, 42, LINES / 2 - 5, COLS / 2 - 18)
+
+    field[0] = NEW_FIELD(1, 8, 0, 0);
+    set_field_back(field[0], A_UNDERLINE);
+    set_field_type(field[0], TYPE_INTEGER, 0, 0, 999999);
+    char buff[16] = {0};
+    snprintf(buff, 16, "%d", pglobals->rfire_count);
+    set_field_buffer(field[0], 0, buff);
+
+    //            h  w  y  x
+    TUIDW_SUBFORM(1, 10, 1, 26)
+
+    box(win, 0, 0);
+    mvwprintw(win, 0, 1, "Requests count");
+    mvwprintw(win, 1, 1, "Request count (⩽999999): ");
+
+    mvwprintw(win, 4, 1, "F1 - Submit");
+    mvwprintw(win, 5, 1, "F2 - Cancel");
+    wrefresh(win);
+    pos_form_cursor(form);
+
+    while (1) {
+        int ch = wgetch(win);
+
+        // clang-format off
+        switch (ch) {
+        TUIDW_STDDRIVER
+        // clang-format on
+
+        // sumbit
+        case KEY_F(1): {
+            // make sure all buffer available and valid
+            if (form_driver(form, REQ_VALIDATION) != E_OK) {
+                break;
+            }
+
+            int count = 0;
+            if (int_from_str(&count, field_buffer(field[0], 0))) {
+                if (count <= 0) {
+                    continue;
+                }
+
+                pglobals->rfire_count   = (u32)count;
+                pglobals->rfire_current = 0;
+
+                pglobals->running = TRUE;
+
+                close_dialog(win, form, field, nfields);
+                return;
+            }
+
+            break;
+        }
+
+        default: form_driver(form, ch); break;
+        }
+    }
+}
+
 // ---------------------------- Parent function --------------------------------
 
 void *
@@ -1048,8 +1111,19 @@ input_thread() {
         case KEY_5: tui_qty_addr(); break;
         case KEY_6: tui_wdata(); break;
 
-        case KEY_F(5): pglobals->running = ~pglobals->running; break;
+        case KEY_F(5):
+            // if have running request sequence right now, kill it
+            if (pglobals->running & pglobals->rfire_count > 0) {
+                pglobals->rfire_count   = 0;
+                pglobals->rfire_current = 0;
+                pglobals->running       = FALSE;
+                break;
+            }
+            pglobals->running = ~pglobals->running;
+            break;
+
         case KEY_F(6): pglobals->random = ~pglobals->random; break;
+        case KEY_F(7): tui_fsequence(); break;
         case KEY_F(8):
             pglobals->stats.requests = 0;
             pglobals->stats.success  = 0;

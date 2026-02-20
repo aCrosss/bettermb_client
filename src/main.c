@@ -294,6 +294,16 @@ main(int argc, char *argv[]) {
             }
         }
 
+        if (globals.rfire_count > 0) {
+            if (globals.rfire_current == globals.rfire_count - 1) {
+                globals.running       = FALSE;
+                globals.rfire_count   = 0;
+                globals.rfire_current = 0;
+            } else {
+                globals.rfire_current++;
+            }
+        }
+
         make_request();
         globals.cxt.last_run_was_on = globals.cxt.protocol;
 

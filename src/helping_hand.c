@@ -280,6 +280,13 @@ wdata_from_str(global_t *global, char *str) {
     return RC_SUCCESS;
 }
 
+int
+int_from_str(int *i, char *str) {
+    trim_spaces(str);
+
+    return parse_int(str, i);
+}
+
 void
 str_curr_endpoint(char out[32], global_t *global) {
     memset(out, 0, 32);
