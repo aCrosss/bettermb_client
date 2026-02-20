@@ -474,55 +474,7 @@ char *field_enum_parity[] = {
 };
 
 void
-tui_endpoint() {
-    const u8 input_field_lane = 16;
-    const u8 legend_len       = 12;
-
-    const u8 win_width  = input_field_lane + legend_len + 2;
-    const u8 win_height = 11;
-
-    //   nfields  h           w          y              x
-    TUIDW_HEAD(5, win_height, win_width, LINES / 2 - 5, COLS / 2 - 16)
-
-    if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
-        // host field
-        field[0] = NEW_FIELD(1, input_field_lane, 0, 0);
-        set_field_back(field[0], A_UNDERLINE);
-        set_field_buffer(field[0], 0, pglobals->tcp_endp.host);
-        // port field
-        field[1] = NEW_FIELD(1, input_field_lane, 1, 0);
-        set_field_back(field[1], A_UNDERLINE);
-        set_field_type(field[1], TYPE_INTEGER, 0, 0, 65535);
-        char buff[16] = {0};
-        snprintf(buff, 16, "%d", pglobals->tcp_endp.tcp_port);
-        set_field_buffer(field[1], 0, buff);
-
-        field[2] = NULL;
-    } else {
-        for (u8 i = 0; i < nfields; i++) {
-            field[i] = NEW_FIELD(1, input_field_lane, i, 0);
-        }
-        // device field
-        set_field_back(field[0], A_UNDERLINE);
-        set_field_buffer(field[0], 0, pglobals->sconf.device);
-        // baud field
-        set_field_type(field[1], TYPE_ENUM, field_enum_baud, 0, 0);
-        set_field_buffer(field[1], 0, str_baud(pglobals->sconf.baud));
-        // data bits field
-        set_field_type(field[2], TYPE_ENUM, field_enum_dbits, 0, 0);
-        set_field_buffer(field[2], 0, str_dbits(pglobals->sconf.data_bits));
-        // stop bits field
-        set_field_type(field[3], TYPE_ENUM, field_enum_sbits, 0, 0);
-        set_field_buffer(field[3], 0, str_sbits(pglobals->sconf.stop_bits));
-        // parity field
-        set_field_type(field[4], TYPE_ENUM, field_enum_parity, 0, 0);
-        set_field_buffer(field[4], 0, str_parity(pglobals->sconf.parity));
-    }
-
-    //            h  w                 y  x
-    TUIDW_SUBFORM(5, input_field_lane, 1, legend_len)
-
-    // TODO: TMP
+tui_endpoint_draw(WINDOW *win, FORM *form) {
     box(win, 0, 0);
     if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
         mvwprintw(win, 0, 1, "TCP Endpoint");
@@ -544,6 +496,43 @@ tui_endpoint() {
     }
     wrefresh(win);
     pos_form_cursor(form);
+}
+
+void
+tui_endpoint() {
+    const u8 input_field_lane = 16;
+    const u8 legend_len       = 12;
+
+    const u8 win_width  = input_field_lane + legend_len + 2;
+    const u8 win_height = 11;
+
+    //   nfields  h           w          y              x
+    TUIDW_HEAD(5, win_height, win_width, LINES / 2 - 5, COLS / 2 - 16)
+
+    if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
+        // host field    i  h  w                 y  x  val
+        TUIDW_FIELD_TEXT(0, 1, input_field_lane, 0, 0, pglobals->tcp_endp.host)
+        // port field   i  h  w                 y  x  z  mn mx     val
+        TUIDW_FIELD_INT(1, 1, input_field_lane, 1, 0, 0, 0, 65535, pglobals->tcp_endp.tcp_port)
+
+        field[2] = NULL;
+    } else {
+        // device field  i  h  w                 y  x  val
+        TUIDW_FIELD_TEXT(0, 1, input_field_lane, 0, 0, pglobals->sconf.device)
+        // baud field    i  h  w                 y  x  enum             val
+        TUIDW_FIELD_ENUM(1, 1, input_field_lane, 1, 0, field_enum_baud, str_baud(pglobals->sconf.baud))
+        // data bits field
+        TUIDW_FIELD_ENUM(2, 1, input_field_lane, 2, 0, field_enum_dbits, str_dbits(pglobals->sconf.data_bits))
+        // stop bits field
+        TUIDW_FIELD_ENUM(3, 1, input_field_lane, 3, 0, field_enum_sbits, str_sbits(pglobals->sconf.stop_bits))
+        // parity field
+        TUIDW_FIELD_ENUM(4, 1, input_field_lane, 4, 0, field_enum_parity, str_parity(pglobals->sconf.parity))
+    }
+
+    //            h  w                 y  x
+    TUIDW_SUBFORM(5, input_field_lane, 1, legend_len)
+
+    tui_endpoint_draw(win, form);
 
     while (1) {
         int ch = wgetch(win);
@@ -573,25 +562,18 @@ tui_endpoint() {
                 } else {
                     // tcp config is bad, just continue with this window
                     // Note: have to redraw after writing in log
-                    box(win, 0, 0);
-                    mvwprintw(win, 0, 1, "TCP Endpoint");
-                    mvwprintw(win, 1, 1, "Host:   ");
-                    mvwprintw(win, 2, 1, "Port:   ");
-
-                    mvwprintw(win, 8, 1, "F1 - Submit");
-                    mvwprintw(win, 9, 1, "F2 - Cancel");
-                    wrefresh(win);
-                    pos_form_cursor(form);
+                    tui_endpoint_draw(win, form);
                     break;
                 }
             } else {
                 serial_cfg new_conf = {0};
-                if (sconf_from_str(&new_conf,
-                                   field_buffer(field[0], 0),
-                                   field_buffer(field[1], 0),
-                                   field_buffer(field[2], 0),
-                                   field_buffer(field[3], 0),
-                                   field_buffer(field[4], 0))) {
+
+                char *b0 = field_buffer(field[0], 0);
+                char *b1 = field_buffer(field[1], 0);
+                char *b2 = field_buffer(field[2], 0);
+                char *b3 = field_buffer(field[3], 0);
+                char *b4 = field_buffer(field[4], 0);
+                if (sconf_from_str(&new_conf, b0, b1, b2, b3, b4)) {
                     memcpy(&pglobals->sconf, &new_conf, sizeof(new_conf));
 
                     relink(pglobals);
@@ -600,18 +582,7 @@ tui_endpoint() {
                 }
                 // serial config is bad, just continue with this window
                 // Note: have to redraw after writing in log
-                box(win, 0, 0);
-                mvwprintw(win, 0, 1, "Serial Endpoint");
-                mvwprintw(win, 1, 1, "Device:    ");
-                mvwprintw(win, 2, 1, "Baudrate:  ");
-                mvwprintw(win, 3, 1, "Data bits: ");
-                mvwprintw(win, 4, 1, "Stop bits: ");
-                mvwprintw(win, 5, 1, "Parity:    ");
-
-                mvwprintw(win, 8, 1, "F1 - Submit");
-                mvwprintw(win, 9, 1, "F2 - Cancel");
-                wrefresh(win);
-                pos_form_cursor(form);
+                tui_endpoint_draw(win, form);
                 break;
             }
 
@@ -661,26 +632,14 @@ tui_uid() {
     //   nfields  h  w   y              x
     TUIDW_HEAD(3, 8, 32, LINES / 2 - 5, COLS / 2 - 16)
 
-    // select
-    field[0] = NEW_FIELD(1, 14, 0, 0);
-    set_field_type(field[0], TYPE_ENUM, use_uid_seq, 0, 0);
-    set_field_buffer(field[0], 0, use_uid_seq[sequence]);
+    // select        i  h  w   y  x
+    TUIDW_FIELD_ENUM(0, 1, 14, 0, 0, use_uid_seq, use_uid_seq[sequence])
 
-    // start uid field
-    field[1] = NEW_FIELD(1, 14, 1, 0);
-    set_field_back(field[1], A_UNDERLINE);
-    set_field_type(field[1], TYPE_INTEGER, 0, 0, 255);
-    char buff[16] = {0};
-    snprintf(buff, 16, "%d", pglobals->slave_id_start);
-    set_field_buffer(field[1], 0, buff);
+    // start uid    i  h  w   y  x  z  mn mx   val
+    TUIDW_FIELD_INT(1, 1, 14, 1, 0, 0, 0, 255, pglobals->slave_id_start)
+    // end uid
+    TUIDW_FIELD_INT(2, 1, 14, 2, 0, 0, 0, 255, pglobals->slave_id_end)
 
-    // end uid field
-    field[2] = NEW_FIELD(1, 14, 2, 0);
-    set_field_back(field[2], A_UNDERLINE);
-    set_field_type(field[2], TYPE_INTEGER, 0, 0, 255);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->slave_id_end);
-    set_field_buffer(field[2], 0, buff);
     // disable uid end field if sequence is set to single
     if (!sequence) {
         field_opts_off(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
@@ -688,7 +647,6 @@ tui_uid() {
 
     //            h  w   y  x
     TUIDW_SUBFORM(5, 16, 1, 13)
-
     tui_uid_draw(win, form, sequence);
 
     while (1) {
@@ -837,34 +795,14 @@ tui_qty_addr() {
     //   nfields  h  w   y              x
     TUIDW_HEAD(4, 9, 26, LINES / 2 - 5, COLS / 2 - 16)
 
-    for (int i = 0; i < nfields; i++) {
-        field[i] = NEW_FIELD(1, 6, i, 0);
-        set_field_back(field[i], A_UNDERLINE);
-    }
-
-    // read address field
-    set_field_type(field[0], TYPE_INTEGER, 0, 0, 0xFFFF);
-    char buff[16] = {0};
-    snprintf(buff, 16, "%d", pglobals->cxt.raddress);
-    set_field_buffer(field[0], 0, buff);
-
-    // read count field
-    set_field_type(field[1], TYPE_INTEGER, 0, 0, 2000);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->cxt.rcount);
-    set_field_buffer(field[1], 0, buff);
-
-    // write address field
-    set_field_type(field[2], TYPE_INTEGER, 0, 0, 0xFFFF);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->cxt.waddress);
-    set_field_buffer(field[2], 0, buff);
-
+    // read address i  h  w  y  x  z  mn mx      val
+    TUIDW_FIELD_INT(0, 1, 6, 0, 0, 0, 0, 0xFFFF, pglobals->cxt.raddress)
+    // read count
+    TUIDW_FIELD_INT(1, 1, 6, 1, 0, 0, 0, 2000, pglobals->cxt.rcount)
+    // write address
+    TUIDW_FIELD_INT(2, 1, 6, 2, 0, 0, 0, 0xFFFF, pglobals->cxt.waddress)
     // write count field
-    set_field_type(field[3], TYPE_INTEGER, 0, 0, 0x07B0);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->cxt.wcount);
-    set_field_buffer(field[3], 0, buff);
+    TUIDW_FIELD_INT(3, 1, 6, 3, 0, 0, 0, 0x07B0, pglobals->cxt.rcount)
 
     //            h  w  y  x
     TUIDW_SUBFORM(5, 6, 1, 18)
@@ -941,20 +879,10 @@ tui_timeouts(global_t *pglobals) {
     //   nfields  h  w   y              x
     TUIDW_HEAD(2, 7, 27, LINES / 2 - 5, COLS / 2 - 16)
 
-    // response timeout field
-    field[0] = NEW_FIELD(1, 6, 0, 0);
-    set_field_back(field[0], A_UNDERLINE);
-    set_field_type(field[0], TYPE_INTEGER, 0, 0, 10000);
-    char buff[16] = {0};
-    snprintf(buff, 16, "%d", pglobals->response_timeout);
-    set_field_buffer(field[0], 0, buff);
-    // send timeout field
-    field[1] = NEW_FIELD(1, 6, 1, 0);
-    set_field_back(field[1], A_UNDERLINE);
-    set_field_type(field[1], TYPE_INTEGER, 0, 0, 10000);
-    memset(buff, 0, 16);
-    snprintf(buff, 16, "%d", pglobals->timeout);
-    set_field_buffer(field[1], 0, buff);
+    // respone t/o  i  h  w  y  x  z  mn mx     val
+    TUIDW_FIELD_INT(0, 1, 6, 0, 0, 0, 0, 10000, pglobals->response_timeout)
+    // send t/o
+    TUIDW_FIELD_INT(1, 1, 6, 1, 0, 0, 0, 10000, pglobals->timeout)
 
     //            h  w  y  x
     TUIDW_SUBFORM(5, 6, 1, 19)
@@ -1021,19 +949,18 @@ tui_wdata() {
     //   nfields  h           w          y                           x
     TUIDW_HEAD(1, win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2)
 
-    // response timeout field
-    field[0] = NEW_FIELD(nlines, input_line_len, 0, 0);
-    set_field_back(field[0], A_UNDERLINE);
-
     // write data to buffer
     int   buff_len = input_line_len * nlines + 1;
-    char *buff     = calloc(buff_len, sizeof(u8));
+    char *buffl    = calloc(buff_len, sizeof(u8));
     for (u8 i = 0; i < current_reg_count; i++) {
-        sprintf(&buff[i * 5], "%04X ", pglobals->cxt.wdata[i]);
+        sprintf(&buffl[i * 5], "%04X ", pglobals->cxt.wdata[i]);
     }
-    buff[buff_len - 1] = '\0';
-    set_field_buffer(field[0], 0, buff);
-    free(buff);
+    buffl[buff_len - 1] = '\0';
+
+    // write values  i  h       w               y  x  val
+    TUIDW_FIELD_TEXT(0, nlines, input_line_len, 0, 0, buffl);
+
+    free(buffl);
 
     //            h       w               y  x
     TUIDW_SUBFORM(nlines, input_line_len, 1, 8)
@@ -1078,12 +1005,8 @@ tui_fsequence() {
     //   nfields  h  w   y              x
     TUIDW_HEAD(1, 7, 42, LINES / 2 - 5, COLS / 2 - 18)
 
-    field[0] = NEW_FIELD(1, 8, 0, 0);
-    set_field_back(field[0], A_UNDERLINE);
-    set_field_type(field[0], TYPE_INTEGER, 0, 0, 999999);
-    char buff[16] = {0};
-    snprintf(buff, 16, "%d", pglobals->rfire_count);
-    set_field_buffer(field[0], 0, buff);
+    // seq count    i  h  w  y  x  zp mn max     val
+    TUIDW_FIELD_INT(0, 1, 8, 0, 0, 0, 0, 999999, pglobals->rfire_count)
 
     //            h  w  y  x
     TUIDW_SUBFORM(1, 10, 1, 26)

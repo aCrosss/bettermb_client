@@ -17,7 +17,7 @@
 
 // ======= BOILERPLATE ======= //
 
-// will produce
+// produces fields, form, win and buff
 // clang-format off
 #define TUIDW_HEAD(nf, wh, ww, wy, wx)    \
     FIELD *field[nf + 1];                 \
@@ -25,7 +25,8 @@
     u8     nfields = nf;                  \
     WINDOW *win = NEW_WIN(wh, ww, wy, wx);\
     keypad(win, TRUE);                    \
-    field[nf] = NULL;
+    field[nf] = NULL;                     \
+    char buff[16] = {0};
 
 
 #define TUIDW_SUBFORM(dwh, dww, dwy, dwx)               \
@@ -40,6 +41,27 @@
     case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;\
     case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV);   break;\
     case KEY_F(2): close_dialog(win, form, field, nfields); return;
+
+//                      i    h  w  y  x  z     mn   mx   val
+#define TUIDW_FIELD_INT(ind, h, w, y, x, zpad, min, max, val)\
+    field[ind] = NEW_FIELD(h, w, y, x);                      \
+    set_field_back(field[ind], A_UNDERLINE);                 \
+    set_field_type(field[ind], TYPE_INTEGER, zpad, min, max);\
+    memset(buff, 0, 16);                                     \
+    snprintf(buff, 16, "%d", val);                           \
+    set_field_buffer(field[ind], 0, buff);
+
+//                         i  h  w  y  x  enum  val
+#define TUIDW_FIELD_ENUM(ind, h, w, y, x, enum, val)  \
+    field[ind] = NEW_FIELD(h, w, y, x);               \
+    set_field_type(field[ind], TYPE_ENUM, enum, 0, 0);\
+    set_field_buffer(field[ind], 0, val);
+
+//                         i  h  w  y  x  val
+#define TUIDW_FIELD_TEXT(ind, h, w, y, x, val)\
+    field[ind] = NEW_FIELD(h, w, y, x);            \
+    set_field_back(field[ind], A_UNDERLINE);       \
+    set_field_buffer(field[ind], 0, val);
 
 // clang-format on
 
