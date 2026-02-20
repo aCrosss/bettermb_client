@@ -298,7 +298,9 @@ destroy_tui() {
 
     endwin();
 
-    fclose(logd.csv);
+    if (logd.csv) {
+        fclose(logd.csv);
+    }
 }
 
 static void
