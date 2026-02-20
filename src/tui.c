@@ -395,19 +395,14 @@ char *field_enum_parity[] = {
 
 void
 tui_endpoint() {
-    FIELD *field[6];
-    FORM  *form;
-    u8     nfields = 5; // Magic number but fine; it's maximum filed for both Serial and TCP
-
     const u8 input_field_lane = 16;
     const u8 legend_len       = 12;
 
     const u8 win_width  = input_field_lane + legend_len + 2;
     const u8 win_height = 11;
 
-    //                   h           w                      y              x
-    WINDOW *win = NEW_WIN(win_height, win_width, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(win, TRUE);
+    //   nfields  h           w          y              x
+    TUIDW_HEAD(5, win_height, win_width, LINES / 2 - 5, COLS / 2 - 16)
 
     if (pglobals->cxt.protocol == MB_PROTOCOL_TCP) {
         nfields  = 2;
@@ -443,14 +438,10 @@ tui_endpoint() {
         // parity field
         set_field_type(field[4], TYPE_ENUM, field_enum_parity, 0, 0);
         set_field_buffer(field[4], 0, str_parity(pglobals->sconf.parity));
-
-        field[5] = NULL;
     }
 
-    form = new_form(field);
-    set_form_win(form, win); //    h  w                 y  x
-    set_form_sub(form, DERWIN(win, 5, input_field_lane, 1, legend_len));
-    post_form(form);
+    //            h  w                 y  x
+    TUIDW_SUBFORM(5, input_field_lane, 1, legend_len)
 
     // TODO: TMP
     box(win, 0, 0);
@@ -480,15 +471,10 @@ tui_endpoint() {
 
         // clang-format off
         switch (ch) {
-        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
-        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
+        TUIDW_STDDRIVER
         case KEY_LEFT     : form_driver(form, REQ_PREV_CHOICE); break;
         case KEY_RIGHT    : form_driver(form, REQ_NEXT_CHOICE); break;
-        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
         // clang-format on
-
-        // cancel
-        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // try submit
         case KEY_F(1):
@@ -591,15 +577,10 @@ tui_uid_draw(WINDOW *win, FORM *form, u8 sequence) {
 
 void
 tui_uid() {
-    FIELD *field[4];
-    FORM  *form;
-    u8     nfields = 3; // Magic number but fine; select, start/singe uid, uid end
-
     u8 sequence = pglobals->sequence_uid; // 0 - single uid, 1 - uid start, uid end
 
-    //                    h  w  y              x
-    WINDOW *win = NEW_WIN(8, 32, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(win, TRUE);
+    //   nfields  h  w   y              x
+    TUIDW_HEAD(3, 8, 32, LINES / 2 - 5, COLS / 2 - 16)
 
     // select
     field[0] = NEW_FIELD(1, 14, 0, 0);
@@ -626,12 +607,8 @@ tui_uid() {
         field_opts_off(field[2], O_VISIBLE | O_EDIT | O_ACTIVE);
     }
 
-    field[3] = NULL;
-
-    form = new_form(field);
-    set_form_win(form, win); //    h  w   y  x
-    set_form_sub(form, DERWIN(win, 5, 16, 1, 13));
-    post_form(form);
+    //            h  w   y  x
+    TUIDW_SUBFORM(5, 16, 1, 13)
 
     tui_uid_draw(win, form, sequence);
 
@@ -640,9 +617,7 @@ tui_uid() {
 
         // clang-format off
         switch (ch) {
-        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
-        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
-        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        TUIDW_STDDRIVER
             // clang-format on
 
         case KEY_LEFT: {
@@ -682,9 +657,6 @@ tui_uid() {
 
             break;
         }
-
-        // cancel
-        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // sumbit
         case KEY_F(1): {
@@ -783,13 +755,8 @@ tui_fc() {
 
 void
 tui_qty_addr() {
-    FIELD *field[5];
-    FORM  *form;
-    u8     nfields = 4; // Magic number but fine; it's maximum filed for both Serial and TCP
-
-    //                   h   w   y              x
-    WINDOW *win = NEW_WIN(9, 26, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(win, TRUE);
+    //   nfields  h  w   y              x
+    TUIDW_HEAD(4, 9, 26, LINES / 2 - 5, COLS / 2 - 16)
 
     for (int i = 0; i < nfields; i++) {
         field[i] = NEW_FIELD(1, 6, i, 0);
@@ -820,12 +787,8 @@ tui_qty_addr() {
     snprintf(buff, 16, "%d", pglobals->cxt.wcount);
     set_field_buffer(field[3], 0, buff);
 
-    field[4] = NULL;
-
-    form = new_form(field);
-    set_form_win(form, win); //    h  w  y  x
-    set_form_sub(form, DERWIN(win, 5, 6, 1, 18));
-    post_form(form);
+    //            h  w  y  x
+    TUIDW_SUBFORM(5, 6, 1, 18)
 
     box(win, 0, 0);
     mvwprintw(win, 0, 1, "Qanity and Addresses");
@@ -843,13 +806,8 @@ tui_qty_addr() {
 
         // clang-format off
         switch (ch) {
-        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
-        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
-        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV);   break;
+        TUIDW_STDDRIVER
         // clang-format on
-
-        // cancel
-        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // sumbit
         case KEY_F(1): {
@@ -901,13 +859,8 @@ tui_qty_addr() {
 
 void
 tui_timeouts(global_t *pglobals) {
-    FIELD *field[3];
-    FORM  *form;
-    u8     nfields = 2; // Magic number but fine; it's maximum filed for both Serial and TCP
-
-    //                   h   w   y              x
-    WINDOW *win = NEW_WIN(7, 27, LINES / 2 - 5, COLS / 2 - 16);
-    keypad(win, TRUE);
+    //   nfields  h  w   y              x
+    TUIDW_HEAD(2, 7, 27, LINES / 2 - 5, COLS / 2 - 16)
 
     // response timeout field
     field[0] = NEW_FIELD(1, 6, 0, 0);
@@ -924,12 +877,8 @@ tui_timeouts(global_t *pglobals) {
     snprintf(buff, 16, "%d", pglobals->timeout);
     set_field_buffer(field[1], 0, buff);
 
-    field[2] = NULL;
-
-    form = new_form(field);
-    set_form_win(form, win); //    h  w  y  x
-    set_form_sub(form, DERWIN(win, 5, 6, 1, 19));
-    post_form(form);
+    //            h  w  y  x
+    TUIDW_SUBFORM(5, 6, 1, 19)
 
     box(win, 0, 0);
     mvwprintw(win, 0, 1, "Timeouts");
@@ -946,13 +895,8 @@ tui_timeouts(global_t *pglobals) {
 
         // clang-format off
         switch (ch) {
-        case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;
-        case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;
-        case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV); break;
+        TUIDW_STDDRIVER
         // clang-format on
-
-        // cancel
-        case KEY_F(2): close_dialog(win, form, field, nfields); return;
 
         // sumbit
         case KEY_F(1): {
@@ -981,10 +925,6 @@ tui_timeouts(global_t *pglobals) {
 
 void
 tui_wdata() {
-    FIELD *field[2];
-    FORM  *form;
-    u8     nfields = 1;
-
     const u8 input_line_len = 40;
     const u8 reg_str_len    = 4; // 4 bytes for register presentation; choosed as bigger of coils/regs
 
@@ -999,9 +939,8 @@ tui_wdata() {
 
     const u8 current_reg_count = CLAMP(pglobals->cxt.wcount, 0, WD_MAX_LEN);
 
-    //                   h           w          y                           x
-    WINDOW *win = NEW_WIN(win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2);
-    keypad(win, TRUE);
+    //   nfields  h           w          y                           x
+    TUIDW_HEAD(1, win_height, win_width, LINES / 2 - win_height / 2, COLS / 2 - win_width / 2)
 
     // response timeout field
     field[0] = NEW_FIELD(nlines, input_line_len, 0, 0);
@@ -1017,12 +956,8 @@ tui_wdata() {
     set_field_buffer(field[0], 0, buff);
     free(buff);
 
-    field[1] = NULL;
-
-    form = new_form(field);
-    set_form_win(form, win); //    h       w               y  x
-    set_form_sub(form, DERWIN(win, nlines, input_line_len, 1, 8));
-    post_form(form);
+    //            h       w               y  x
+    TUIDW_SUBFORM(nlines, input_line_len, 1, 8)
 
     box(win, 0, 0);
     mvwprintw(win, 0, 1, "Write data");

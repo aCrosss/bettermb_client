@@ -12,6 +12,36 @@
 #define NEW_FIELD(h, w, y, x)   (new_field(h, w, y, x, 0, 0))
 #define DERWIN(win, h, w, y, x) (derwin(win, h, w, y, x))
 
+// ======= BOILERPLATE ======= //
+
+// will produce
+// clang-format off
+#define TUIDW_HEAD(nf, wh, ww, wy, wx)    \
+    FIELD *field[nf + 1];                 \
+    FORM  *form;                          \
+    u8     nfields = nf;                  \
+    WINDOW *win = NEW_WIN(wh, ww, wy, wx);\
+    keypad(win, TRUE);                    \
+    field[nf] = NULL;
+
+
+#define TUIDW_SUBFORM(dwh, dww, dwy, dwx)               \
+    form = new_form(field);                             \
+    set_form_win(form, win);                            \
+    set_form_sub(form, DERWIN(win, dwh, dww, dwy, dwx));\
+    post_form(form);
+
+
+#define TUIDW_STDDRIVER                                          \
+    case KEY_DOWN     : form_driver(form, REQ_NEXT_FIELD); break;\
+    case KEY_UP       : form_driver(form, REQ_PREV_FIELD); break;\
+    case KEY_BACKSPACE: form_driver(form, REQ_DEL_PREV);   break;\
+    case KEY_F(2): close_dialog(win, form, field, nfields); return;
+
+// clang-format on
+
+// ======= BOILERPLATE ======= //
+
 #define KEY_1 49
 #define KEY_2 50
 #define KEY_3 51
