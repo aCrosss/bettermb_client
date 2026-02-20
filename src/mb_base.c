@@ -726,23 +726,23 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         u8 rsp_fcode = rsp[0] & ~0x80;
         // fc not equal anyway
         if ((fcode != rsp[0]) & (fcode != rsp_fcode)) {
-            log_linef("! exception code; req-rsp fc not same (req: %d, rsp: %d):", fcode, rsp_fcode);
+            log_req_errf("! exception code; req-rsp fc not same (req: %d, rsp: %d):", fcode, rsp_fcode);
             return RC_FAIL;
         }
 
         mb_ex_t exc = rsp[1];
         if (is_valid_ex_code(exc)) {
-            log_linef("! slave returned valid exception code: %s:", str_ex_code(exc));
+            log_req_errf("! slave returned valid exception code: %s:", str_ex_code(exc));
             return RC_FAIL;
         } else {
-            log_linef("! slave returned invalid exception code: 0x%02X:", exc);
+            log_req_errf("! slave returned invalid exception code: 0x%02X:", exc);
             return RC_FAIL;
         }
     }
 
     // function codes must be equal
     if (req[0] != rsp[0]) {
-        log_linef("! req-rsp fc not same (req: %d, rsp: %d):", fcode, rsp[0]);
+        log_req_errf("! req-rsp fc not same (req: %d, rsp: %d):", fcode, rsp[0]);
         return RC_FAIL;
     }
 
@@ -753,12 +753,12 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         nbytes = (qty + 7) / 8;
 
         if (rsp[1] != nbytes) {
-            log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", nbytes, rsp[1]);
+            log_req_errf("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", nbytes, rsp[1]);
             return RC_FAIL;
         }
 
         if (rsp_len != nbytes + 2) {
-            log_linef(
+            log_req_errf(
               "  ^ expected-recieved response len doesn't match (expected: %d, recieved: %d):", rsp_len, nbytes + 2);
             return RC_FAIL;
         }
@@ -771,12 +771,12 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         nbytes = qty * 2;
 
         if (rsp[1] != nbytes) {
-            log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", fcode, rsp[0]);
+            log_req_errf("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", fcode, rsp[0]);
             return RC_FAIL;
         }
 
         if (rsp_len != nbytes + 2) {
-            log_linef(
+            log_req_errf(
               "! expected-recieved response len doesn't match (expected: %d, recieved: %d):", rsp_len, nbytes + 2);
             return RC_FAIL;
         }
@@ -787,7 +787,7 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
     case MB_FC_WRITE_SINGLE_COIL:
     case MB_FC_WRITE_SINGLE_REGISTER:
         if (memcmp(req, rsp, req_len) != 0) {
-            log_linef("! expected echo of request:");
+            log_req_errf("! expected echo of request:");
             return RC_FAIL;
         }
 
@@ -798,7 +798,7 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
     case MB_FC_WRITE_MULTIPLE_COILS:
     case MB_FC_WRITE_MULTIPLE_REGISTERS:
         if (memcmp(req, rsp, 5) != 0) {
-            log_linef("! expected echo of firtst 5 bytes of request (fc, starting addr and qty of outputs):");
+            log_req_errf("! expected echo of firtst 5 bytes of request (fc, starting addr and qty of outputs):");
             return RC_FAIL;
         }
 
@@ -808,12 +808,12 @@ check_req_rsp_pdu(u8 *req, u8 req_len, u8 *rsp, u8 rsp_len) {
         nbytes = qty * 2;
 
         if (rsp[1] != nbytes) {
-            log_linef("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", fcode, rsp[0]);
+            log_req_errf("! expected-recieved byte count doesn't match (req: %d, rsp: %d):", fcode, rsp[0]);
             return RC_FAIL;
         }
 
         if (rsp_len != nbytes + 2) {
-            log_linef(
+            log_req_errf(
               "! expected-recieved response len doesn't match (expected: %d, recieved: %d):", rsp_len, nbytes + 2);
             return RC_FAIL;
         }

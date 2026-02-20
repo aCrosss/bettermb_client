@@ -28,7 +28,7 @@
 #define CLAMP(v, min, max) (((v) > (max)) ? (max) : (((v) < (min)) ? (min) : (v)))
 
 // ind++ and clamp it between min and max
-#define PIND_CLAM(val, min, max) ((((val + 1) % (max + 1)) == 0) ? (val = min) : (val++))
+#define PIND_CLAMP(val, min, max) ((((val + 1) % (max + 1)) == 0) ? (val = min) : (val++))
 
 // -------- typedefs --------------------------------------------------------------------
 

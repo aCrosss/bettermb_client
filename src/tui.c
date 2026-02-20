@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,10 +9,62 @@
 #include "helping_hand.h"
 #include "mb_base.h"
 #include "tui.h"
+#include "types.h"
 #include "uplink.h"
 
 pthread_mutex_t mutex;
 global_t       *pglobals;
+
+log_t logd = {0};
+
+// ======================================================================================
+// CSV LOGS
+// ======================================================================================
+
+// open csv file with
+rc_t
+open_csv_log(u8 ind) {
+    char fname[16] = {0};
+    sprintf(fname, "bmblog_%d.csv", ind);
+
+    FILE *f = fopen(fname, "w");
+    if (!f) {
+        log_linef("! failed to create csv log file: %s", strerror(errno));
+        return RC_FAIL;
+    }
+
+    fprintf(f, "Time,Endpoint,Direction,Payload,Error\n");
+    logd.csv  = f;
+    logd.find = ind;
+    logd.lind = 1;
+
+    log_linef("> csv log started %s", fname);
+    return RC_SUCCESS;
+}
+
+// write to csv
+void
+write_csv_log(const char *time, const char *endp, const char *dir, const char *payload) {
+    if (!logd.csv) {
+        open_csv_log(logd.find);
+    }
+
+    fprintf(logd.csv, "%s,%s,%s,%s,%s\n", time, endp, dir, payload, logd.last_err);
+
+    memset(logd.last_err, MAX_LINE_LEN, '\0');
+
+    logd.lind++;
+    if (logd.lind >= CSV_LINES_CAP) {
+        fclose(logd.csv);
+
+        PIND_CLAMP(logd.find, 0, CSV_IND_CAP);
+        open_csv_log(logd.find);
+    }
+}
+
+// ======================================================================================
+// /CSV LOGS
+// ======================================================================================
 
 /* TO STRING SECTION */
 
@@ -85,8 +138,6 @@ str_parity(int parity) {
 
 WINDOW *wheader;
 WINDOW *wlog;
-
-log_t logd = {0};
 
 static const char *
 str_dirstat(dirstat_t ds) {
@@ -246,6 +297,8 @@ destroy_tui() {
     delwin(wlog);
 
     endwin();
+
+    fclose(logd.csv);
 }
 
 static void
@@ -270,7 +323,16 @@ log_traffic_str(const char *str, dirstat_t ds) {
     gettimeofday(&tv, NULL); // Get current time with microseconds
     u64 ms = tv.tv_usec / 1000;
 
-    log_linef(".%03luZ %s %s <!%s>", ms, endp, str_dirstat(ds), str);
+    u8 time[8] = {0};
+    sprintf(time, ".%03lu", ms);
+
+    // log csv
+    if (pglobals->use_csv_log) {
+        strcpy(logd.last_err, str);
+        write_csv_log(time, endp, str_dirstat(ds), "<NONE>");
+    }
+
+    log_linef("%s %s %s <!%s>", time, endp, str_dirstat(ds), str);
 }
 
 void
@@ -283,12 +345,20 @@ log_adu(u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t d
     gettimeofday(&tv, NULL); // Get current time with microseconds
     u64 ms = tv.tv_usec / 1000;
 
+    u8 time[8] = {0};
+    sprintf(time, ".%03lu", ms);
+
     u8 left_side[MAX_LINE_LEN] = {0};
     sprintf(left_side, ".%03luZ %s %s", ms, endp, str_dirstat(ds));
 
     u8 payload[1024];
     format_payload(payload, adu, adu_len, protocol);
     int payload_len = strlen(payload);
+
+    // log csv
+    if (pglobals->use_csv_log) {
+        write_csv_log(time, endp, str_dirstat(ds), payload);
+    }
 
     snprintf(buff, MAX_LINE_LEN - 1, "%s %s", left_side, payload);
     buff[MAX_LINE_LEN - 1] = '\0';
@@ -331,6 +401,16 @@ log_linef(const char *format, ...) {
     va_end(va);
 
     log_line(buff);
+}
+
+void
+log_req_errf(const char *format, ...) {
+    va_list va;
+    va_start(va, format);
+    vsnprintf(logd.last_err, MAX_LINE_LEN, format, va);
+    va_end(va);
+
+    log_line(logd.last_err);
 }
 
 // =============================================================================

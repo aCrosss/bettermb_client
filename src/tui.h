@@ -8,6 +8,9 @@
 
 #define HEADER_BOTTOM 16 // header bottom position in y coords
 
+#define CSV_IND_CAP   8
+#define CSV_LINES_CAP 1023
+
 #define NEW_WIN(h, w, y, x)     (newwin(h, w, y, x))
 #define NEW_FIELD(h, w, y, x)   (new_field(h, w, y, x, 0, 0))
 #define DERWIN(win, h, w, y, x) (derwin(win, h, w, y, x))
@@ -61,6 +64,12 @@ typedef struct log {
     u8 linec;
     u8 max_rows;
     s8 lines[MAX_LINES][MAX_LINE_LEN];
+
+    // csv log
+    u8    last_err[MAX_LINE_LEN];
+    u8    find;
+    u32   lind;
+    FILE *csv;
 } log_t;
 
 typedef enum {
@@ -78,5 +87,6 @@ void  log_line(const char *line);
 void  log_linef(const char *format, ...);
 void  log_traffic_str(const char *str, dirstat_t ds);
 void  log_adu(u8 adu[MB_MAX_ADU_LEN], int adu_len, mb_protocol_t protocol, dirstat_t ds);
+void  log_req_errf(const char *format, ...);
 
 #endif

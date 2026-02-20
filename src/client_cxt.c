@@ -85,6 +85,7 @@ help(const char *progname) {
       "                                           Default: No.\n"
       "  -T, --timeout=NUM                        Timeout between requests (ms) (0-600000).\n"
       "                                           Default: 1000.\n\n"
+      "  --csv                                    Log traffic in .csv files\n\n"
       "  -h, --help                               Give this help list\n"
       "      --usage                              Give a short usage message\n";
 
@@ -120,6 +121,8 @@ handle_startup_args(int argc, char **argv, global_t *global) {
           {"write-count", OPT_ARG_REQUIRED, 0, 'w'},
           {"response-timeout", OPT_ARG_REQUIRED, 0, 'q'},
           {"timeout", OPT_ARG_REQUIRED, 0, 'T'},
+          // common
+          {"csv", OPT_ARG_NONE, 0, 0},
           {0},
         };
 
@@ -145,6 +148,8 @@ handle_startup_args(int argc, char **argv, global_t *global) {
                 if (parse_int(optarg, &global->sconf.stop_bits) < 0) {
                     return RC_ERROR;
                 }
+            } else if (strcmp(long_options[option_index].name, "csv") == 0) {
+                global->use_csv_log = TRUE;
             }
             break;
 

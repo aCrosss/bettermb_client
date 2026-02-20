@@ -49,6 +49,8 @@ typedef struct global {
 
     statistic_t stats;
 
+    u8 use_csv_log;
+
     u8  sequence_uid; // if 0 - use just single slave_id_start, if 1 - sequence from start to end
     u8  current_uid;
     int slave_id_start;
